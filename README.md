@@ -72,13 +72,13 @@ Will add a downtime for a servicegroup for two days beginning at June 23 2019 12
 Will remove the downtime set before.
 
 TODO:
-  - There should be a CLI argument to list the downtimes in human readable fashion
-  - The classes are just 'containers' that store data. It would make more sense to make them iterable.
-  - The setup of the logging facility has been realised by calling a function. This is kind of ugly. Nice would be a reference to the logging facility (Has a)
-  - It should be possible to only allow downtimes for hosts and services where the user is permitted. (How to pass the user credentials without exposing them to all others)
-  - Rethink the architecture of the model (I'm not happy)
-  - Make the comments python like
-  - Implement unit tests
-  - Combine livestatus queries instead of querying every single host or service
+ - [ ] There should be a CLI argument to list the downtimes in human readable fashion
+ - [ ] The classes are just 'containers' that store data. It would make more sense to make them iterable.
+ - [ ] The setup of the logging facility has been realised by calling a function. This is kind of ugly. Nice would be a reference to the logging facility (Has a)
+ - [ ] It should be possible to only allow downtimes for hosts and services where the user is permitted. (How to pass the user credentials without exposing them to all others)
+ - [ ] Rethink the architecture of the model (I'm not happy)
+ - [ ] Make the comments python like
+ - [ ] Implement unit tests
+ - [ ] Combine livestatus queries instead of querying every single host or service
   
-Since I'm not really familiar with python, I still learning, I highly appreciate any input that hepls me to improve my skills.  
+Since I'm not really familiar with python, I still learning, I highly appreciate any input that helps me to improve my skills.  
