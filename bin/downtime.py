@@ -3,7 +3,7 @@
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
 # ------------------------------------------------------------------------------
 #
-#   Programm        : downtime.py
+#   Program         : downtime.py
 #
 # ------------------------------------------------------------------------------
 #
@@ -42,25 +42,25 @@
 #   External Modules
 # ------------------------------------------------------------------------------
 import os
+import sys
 import logging
 import argparse
 from datetime import datetime
 import livestatus
 import requests
-import sys
 
 
 # ------------------------------------------------------------------------------
-#   Globale Variables
+#   Global Variables
 # ------------------------------------------------------------------------------
-# make loging facility globaly available
+# make logging facility globally available
 global logger
 
 # build the working environment
 path_bin = os.path.dirname(os.path.realpath(__file__))
-path_etc = os.path.dirname(path_bin) + "/etc"
-path_lib = os.path.dirname(path_bin) + "/lib"
-path_var_log = os.path.dirname(path_bin) + "/var/log"
+path_base = os.path.dirname(path_bin)
+path_etc = os.path.join(path_base, 'etc')
+path_var_log = os.path.join(path_base, 'var/log')
 if not os.path.exists(path_var_log):
     os.mkdir(path_var_log)
 
@@ -94,7 +94,7 @@ class Sites(object):
     #   Return          : -             N/A
     # --------------------------------------------------------------------------
     def __init__(self, user, secret, path, url):
-        if Sites.logger == None:
+        if Sites.logger is None:
             Sites.logger = setup_logging(self.__class__.__name__)
         self.user = user
         self.secret = secret
@@ -103,27 +103,29 @@ class Sites(object):
         self.sites = {}
         self.sites_with_data = []
         self.payload = {
-            "action"        : 'get_site',
-            "_username"     : self.user,
-            "_secret"       : self.secret,
-            "output_format" : 'python',
-            "site_id"       : '',
+            "action": 'get_site',
+            "_username": self.user,
+            "_secret": self.secret,
+            "output_format": 'python',
+            "site_id": '',
         }
 
-        self.logger.debug('Constructor call passed arguments user: %s, path: %s, url: %s', self.user, self.path, self.url)
+        self.logger.debug('Constructor call passed arguments user: %s, path: %s, url: %s',
+                          self.user, self.path, self.url)
         for sitename in os.listdir(self.path):
             self.payload["site_id"] = sitename
             self.logger.debug('Collecting informations for site %s', sitename)
-            response = requests.get(self.url + "webapi.py", params = self.payload)
+            response = requests.get(self.url + "webapi.py", params=self.payload)
             site_struct = eval(response.content)
 
             # Make sure that the collected sites are available
-            if site_struct['result_code'] == 0 and site_struct['result']['site_config']['disabled'] == False:
+            if site_struct['result_code'] == 0 and site_struct['result']['site_config']['disabled'] is False:
                 self.logger.debug('Site %s is enabled', sitename)
                 socket_path = self.path + "/" + sitename + "/tmp/run/live"
                 if os.path.exists(socket_path):
                     self.logger.debug('Livestatus socket found: %s', socket_path)
-                    self.sites[sitename] = Site(sitename, site_struct['result']['site_config']['alias'], "unix:" + socket_path)
+                    self.sites[sitename] = Site(sitename, site_struct['result']['site_config']['alias'],
+                                                "unix:" + socket_path)
                 else:
                     self.logger.error('Livestatus socket not found: %s', socket_path)
             else:
@@ -206,14 +208,15 @@ class Site(object):
     #   Return          : -             N/A
     # --------------------------------------------------------------------------
     def __init__(self, sitename, alias, socket):
-        if Site.logger == None:
+        if Site.logger is None:
             Site.logger = setup_logging(self.__class__.__name__)
         self.sitename = sitename
         self.alias = alias
         self.socket = socket
         self.connection = livestatus.SingleSiteConnection(self.socket)
         self.monitoring_objects = []
-        self.logger.debug('Constructor call passed arguments sitename: %s, alias: %s, socket: %s', self.sitename, self.alias, self.socket)
+        self.logger.debug('Constructor call passed arguments sitename: %s, alias: %s, socket: %s',
+                          self.sitename, self.alias, self.socket)
 
     # --------------------------------------------------------------------------
     #   Method          : get_sitename
@@ -310,7 +313,7 @@ class Host(object):
     #   Return          : -             N/A
     # --------------------------------------------------------------------------
     def __init__(self, host_name):
-        if Host.logger == None:
+        if Host.logger is None:
             Host.logger = setup_logging(self.__class__.__name__)
         self.host_name = host_name
         self.logger.debug('Constructor call passed arguments host_name: %s', self.host_name)
@@ -325,8 +328,8 @@ class Host(object):
     #   Return          : string        the query
     # --------------------------------------------------------------------------
     def get_query(self):
-        query = Query
-        return query.get_query(self._table, self._columns, { self._columns[0]: self.get_host_name()})
+        query = Query()
+        return query.get_query(self._table, self._columns, {self._columns[0]: self.get_host_name()})
 
     # --------------------------------------------------------------------------
     #   Method          : get_host_name
@@ -352,8 +355,9 @@ class Host(object):
     #                     obj           Optional a object reference
     #   Return          : -             N/A
     # --------------------------------------------------------------------------
-    def get_data(self, connection, store_func, query_func, obj = None):
-        if obj == None:
+    @staticmethod
+    def get_data(connection, store_func, query_func, obj=None):
+        if obj is None:
             data = connection.query_table(query_func())
         else:
             data = connection.query_table(query_func(obj))
@@ -394,7 +398,8 @@ class Host(object):
     #   Return          : string        Nether SCHEDULE_HOST_DOWNTIME or
     #                                   DEL_HOST_DOWNTIME
     # --------------------------------------------------------------------------
-    def get_downtime_operation(self, operator):
+    @staticmethod
+    def get_downtime_operation(operator):
         return "SCHEDULE_HOST_DOWNTIME" if operator == 'schedule' else "DEL_HOST_DOWNTIME"
 
 
@@ -420,12 +425,13 @@ class Service(object):
     #                     service_name  A string with the service name
     #   Return          : -             N/A
     # --------------------------------------------------------------------------
-    def __init__(self, host_name = None, service_name = None):
-        if Service.logger == None:
+    def __init__(self, host_name=None, service_name=None):
+        if Service.logger is None:
             Service.logger = setup_logging(self.__class__.__name__)
         self.host_name = host_name
         self.service_name = service_name
-        self.logger.debug('Constructor call passed arguments host_name: %s, service_name: %s', self.host_name, self.service_name)
+        self.logger.debug('Constructor call passed arguments host_name: %s, service_name: %s',
+                          self.host_name, self.service_name)
 
     # --------------------------------------------------------------------------
     #   Method          : get_query
@@ -437,8 +443,9 @@ class Service(object):
     #   Return          : string        the query
     # --------------------------------------------------------------------------
     def get_query(self):
-        query = Query
-        return query.get_query(self._table, self._columns, {self._columns[0]: self.get_host_name(), self._columns[1]: self.get_service_name()})
+        query = Query()
+        return query.get_query(self._table, self._columns, {self._columns[0]: self.get_host_name(),
+                                                            self._columns[1]: self.get_service_name()})
 
     # --------------------------------------------------------------------------
     #   Method          : get_host_name
@@ -477,8 +484,9 @@ class Service(object):
     #                     obj           Optional a object reference
     #   Return          : -             N/A
     # --------------------------------------------------------------------------
-    def get_data(self, connection, store_func, query_func, obj = None):
-        if obj == None:
+    @staticmethod
+    def get_data(connection, store_func, query_func, obj=None):
+        if obj is None:
             data = connection.query_table(query_func())
         else:
             data = connection.query_table(query_func(obj))
@@ -507,7 +515,7 @@ class Service(object):
     #                                   object
     # --------------------------------------------------------------------------
     def get_as_a_string(self):
-        return "{};{}".format(self.get_host_name(), self.get_service_name())
+        return "{0};{1}".format(self.get_host_name(), self.get_service_name())
 
     # --------------------------------------------------------------------------
     #   Method          : get_downtime_operation
@@ -520,7 +528,8 @@ class Service(object):
     #   Return          : string        Nether SCHEDULE_SVC_DOWNTIME or
     #                                   DEL_SVC_DOWNTIME
     # --------------------------------------------------------------------------
-    def get_downtime_operation(self, operator):
+    @staticmethod
+    def get_downtime_operation(operator):
         return "SCHEDULE_SVC_DOWNTIME" if operator == 'schedule' else "DEL_SVC_DOWNTIME"
 
 
@@ -548,7 +557,7 @@ class Hostgroup(object):
     #   Return          : -             N/A
     # --------------------------------------------------------------------------
     def __init__(self, hostgroup):
-        if Hostgroup.logger == None:
+        if Hostgroup.logger is None:
             Hostgroup.logger = setup_logging(self.__class__.__name__)
         self.hostgroup = hostgroup
         self.logger.debug('Constructor call passed arguments hostgroup: %s', self.hostgroup)
@@ -588,7 +597,7 @@ class Hostgroup(object):
     #                     query_func    Not used but needed
     #   Return          : -             N/A
     # --------------------------------------------------------------------------
-    def get_data(self, connection, store_func, query_func = None):
+    def get_data(self, connection, store_func, query_func=None):
         data = connection.query_table(self.get_query())
         if data:
             for data_set in data[0][0]:
@@ -620,7 +629,7 @@ class Servicegroup(object):
     #   Return          : -             N/A
     # --------------------------------------------------------------------------
     def __init__(self, servicegroup):
-        if Servicegroup.logger == None:
+        if Servicegroup.logger is None:
             Servicegroup.logger = setup_logging(self.__class__.__name__)
         self.servicegroup = servicegroup
         self.logger.debug('Constructor call passed arguments servicegroup: %s', self.servicegroup)
@@ -661,7 +670,7 @@ class Servicegroup(object):
     #                     query_func    Not used but needed
     #   Return          : -             N/A
     # --------------------------------------------------------------------------
-    def get_data(self, connection, store_func, query_func = None):
+    def get_data(self, connection, store_func, query_func=None):
         data = connection.query_table(self.get_query())
         if data:
             for data_set in data[0][0]:
@@ -681,7 +690,8 @@ class Servicegroup(object):
 class Downtime(object):
     logger = None
     _table = 'downtimes'
-    _columns = ['id', 'author', 'host_name', 'service_description', 'start_time', 'end_time', 'duration', 'fixed', 'comment']
+    _columns = ['id', 'author', 'host_name', 'service_description', 'start_time',
+                'end_time', 'duration', 'fixed', 'comment']
     _lables = ['ID', 'Author', 'Hostname', 'Servicename', 'Start', 'End', 'Duration', 'Fixed', 'Comment']
 
     # --------------------------------------------------------------------------
@@ -696,20 +706,21 @@ class Downtime(object):
     #                                   time
     #   Return          : -             N/A
     # --------------------------------------------------------------------------
-    def __init__(self, sites, author, comment = None):
-        if Downtime.logger == None:
+    def __init__(self, sites, author, comment=None):
+        if Downtime.logger is None:
             Downtime.logger = setup_logging(self.__class__.__name__)
         self.sites = sites
         self.author = author
         self.comment = comment
         self.data = []
         self.dates = {
-            'now'           : int(datetime.now().strftime('%s')),
-            'start_time'    : None,
-            'end_time'      : None,
-            'duration'      : None,
+            'now': int(datetime.now().strftime('%s')),
+            'start_time': None,
+            'end_time': None,
+            'duration': None,
         }
-        self.logger.debug('Constructor call passed arguments sites (keys): %s, author: %s, comment: %s', self.sites.sites.keys(), self.author, self.comment)
+        self.logger.debug('Constructor call passed arguments sites (keys): %s, author: %s, comment: %s',
+                          self.sites.sites.keys(), self.author, self.comment)
 
     # --------------------------------------------------------------------------
     #   Method          : _request_object
@@ -757,9 +768,9 @@ class Downtime(object):
     #                     obj           A object reference of Host or Service
     #   Return          : string        The query string
     # --------------------------------------------------------------------------
-    def get_query(self, obj = None):
+    def get_query(self, obj=None):
         query = Query()
-        if obj == None:
+        if obj is None:
             return query.get_query(self._table, self._columns)
         else:
             return query.get_query(self._table, self._columns, obj.get_filter_for_downtime())
@@ -776,7 +787,7 @@ class Downtime(object):
     #                     filter        A boolean, ether True or False
     #   Return          : -             N/A
     # --------------------------------------------------------------------------
-    def list_downtimes(self, filter=True):
+    def list_downtimes(self, is_filter=True):
         print "{0:8s} {1:10s} {2:20s} {3:40s} {4:10s} {5:10s} {6:10s} {7:6s} {8:80s}".format(
             self._lables[0],
             self._lables[1],
@@ -788,7 +799,7 @@ class Downtime(object):
             self._lables[7],
             self._lables[8]
         )
-        if filter:
+        if is_filter:
             for site, obj in self._request_objects():
                 obj.get_data(self.sites.sites[site].get_connection(), self.print_downtime, self.get_query, obj)
         else:
@@ -836,9 +847,9 @@ class Downtime(object):
     #                     connection    Optional and not used
     #   Return          : -             N/A
     # --------------------------------------------------------------------------
-    def print_downtime(self, data, obj = None, connection = None):
+    def print_downtime(self, data, obj=None, connection=None):
         for line in data:
-            if self.get_comment() == None or self.get_comment() == line[8].encode('utf-8'):
+            if self.get_comment() is None or self.get_comment() == line[8].encode('utf-8'):
                 print "{0:8d} {1:10s} {2:20s} {3:40s} {4:10d} {5:10d} {6:10d} {7:6d} {8:80s}".format(
                     line[0],
                     line[1][:10].encode('utf-8'),
@@ -1015,7 +1026,8 @@ class Downtime(object):
     #   Return          : boolean       True if plausible else False
     # --------------------------------------------------------------------------
     def validate_dates(self):
-        self.logger.debug('Validate downtime: %d < %d and %d > %d', self.get_start_time(), self.get_end_time(), self.get_end_time(), self.get_now())
+        self.logger.debug('Validate downtime: %d < %d and %d > %d', self.get_start_time(),
+                          self.get_end_time(), self.get_end_time(), self.get_now())
         return True if self.get_start_time() < self.get_end_time() and self.get_end_time() > self.get_now() else False
 
 
@@ -1039,7 +1051,7 @@ class Query(object):
     #   Return          : -             N/A
     # --------------------------------------------------------------------------
     def __init__(self):
-        if Query.logger == None:
+        if Query.logger is None:
             Query.logger = setup_logging(self.__class__.__name__)
 
     # --------------------------------------------------------------------------
@@ -1056,11 +1068,11 @@ class Query(object):
     #                                   valid column name of the queried table
     #   Return          : string        The query string
     # --------------------------------------------------------------------------
-    def get_query(self, table, columns, filter = None):
+    def get_query(self, table, columns, is_filter=None):
         query = "GET {0}{1}{2}".format(
             table,
             self._columns(columns),
-            self._filter(filter))
+            self._filter(is_filter))
         self.logger.debug('Livestatus query: %s', ' - '.join(query.split('\n')))
         return query
 
@@ -1074,8 +1086,9 @@ class Query(object):
     #                     columns       The requested columns.
     #   Return          : string        The query string
     # --------------------------------------------------------------------------
-    def _columns(self, columns):
-        if columns == None:
+    @staticmethod
+    def _columns(columns):
+        if columns is None:
             return ""
         else:
             return "\nColumns: " + " ".join(columns)
@@ -1091,13 +1104,14 @@ class Query(object):
     #                                   pairs
     #   Return          : string        The query string
     # --------------------------------------------------------------------------
-    def _filter(self, filter):
+    @staticmethod
+    def _filter(a_filter):
         string = ""
 
-        if filter == None:
+        if a_filter is None:
             return string
 
-        for key, value in filter.items():
+        for key, value in a_filter.items():
             if type(value) == list:
                 for v in value:
                     string += "\nFilter: " + key + " = " + v
@@ -1128,7 +1142,7 @@ class Command(object):
     #   Return          : -             N/A
     # --------------------------------------------------------------------------
     def __init__(self):
-        if Command.logger == None:
+        if Command.logger is None:
             Command.logger = setup_logging(self.__class__.__name__)
 
     # --------------------------------------------------------------------------
@@ -1146,7 +1160,7 @@ class Command(object):
     #   Return          : command       The created command string
     # --------------------------------------------------------------------------
     def add_downtime(self, obj, downtime):
-        command  = "[" + str(downtime.get_now()) + "] "
+        command = "[" + str(downtime.get_now()) + "] "
         command += obj.get_downtime_operation('schedule') + ";"
         command += obj.get_as_a_string() + ";"
         command += str(downtime.get_start_time()) + ";"
@@ -1199,8 +1213,8 @@ class Command(object):
 # ------------------------------------------------------------------------------
 def setup_logging(name):
     # setup of the log facility
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.DEBUG)
+    log = logging.getLogger(name)
+    log.setLevel(logging.DEBUG)
 
     # define formatter
     form_console = logging.Formatter(
@@ -1223,10 +1237,11 @@ def setup_logging(name):
     log_file.setFormatter(form_file)
 
     # assign each handler to the logger
-    logger.addHandler(log_console)
-    logger.addHandler(log_file)
+    log.addHandler(log_console)
+    log.addHandler(log_file)
 
-    return logger
+    return log
+
 
 # ------------------------------------------------------------------------------
 #   Function        : validate_downtime
@@ -1241,17 +1256,20 @@ def setup_logging(name):
 def validate_downtime(args, downtime):
     # Check argument combination for the dates
     # -b and -B (mandatory)
-    downtime.set_start_time(datetime.strptime(args.begindate + " " + args.begin, "%d-%m-%Y %H:%M").strftime('%s'))
+    downtime.set_start_time(datetime.strptime(args.begindate + " " + args.begin,
+                                              "%d-%m-%Y %H:%M").strftime('%s'))
     # -e and -E (optional)
     if args.enddate or args.end:
         if args.enddate:
             if args.end:
-                downtime.set_end_time(datetime.strptime(args.enddate + " " + args.end, "%d-%m-%Y %H:%M").strftime('%s'))
+                downtime.set_end_time(datetime.strptime(args.enddate + " " + args.end,
+                                                        "%d-%m-%Y %H:%M").strftime('%s'))
             else:
                 logger.critical('Please specify the end time (-e) of the downtime')
                 return False
         else:
-            downtime.set_end_time(datetime.strptime(datetime.now().strftime('%d-%m-%Y') + " " + args.end, "%d-%m-%Y %H:%M").strftime('%s'))
+            downtime.set_end_time(datetime.strptime(datetime.now().strftime('%d-%m-%Y') + " " + args.end,
+                                                    "%d-%m-%Y %H:%M").strftime('%s'))
         downtime.calculate_duration()
     # -d (optional)
     else:
@@ -1261,6 +1279,7 @@ def validate_downtime(args, downtime):
 
     # Check for plausability
     return downtime.validate_dates()
+
 
 # ------------------------------------------------------------------------------
 #   Function        : validate_date
@@ -1280,6 +1299,7 @@ def validate_date(date):
         logger.critical(msg)
         raise argparse.ArgumentTypeError(msg)
 
+
 # ------------------------------------------------------------------------------
 #   Function        : validate_time
 # ------------------------------------------------------------------------------
@@ -1297,6 +1317,7 @@ def validate_time(time):
         msg = "Time argument is not in a valid format: '{0}'.".format(time)
         logger.critical(msg)
         raise argparse.ArgumentTypeError(msg)
+
 
 # ------------------------------------------------------------------------------
 #   Function        : validate_args
@@ -1333,7 +1354,7 @@ def validate_args(args, sites):
         sites.append_obj_to_site(obj)
     # in all other cases generate an error message
     else:
-        if args.ignore or (args.comment != None and args.operation == 'list'):
+        if args.ignore or (args.comment is not None and args.operation == 'list'):
             logger.debug('Ignore flag is set or just a listing of all downtimes is requested')
             return True
         else:
@@ -1357,76 +1378,76 @@ def main(argv):
 
     # group host
     ghost = parser.add_mutually_exclusive_group()
-    ghost.add_argument('-n', '--host', type=str,
-        help='The name of the host'
-    )
-    ghost.add_argument('-N', '--hostgroup', type=str,
-        help='The name of the hostgroup'
-    )
+    ghost.add_argument('-n', '--host',
+                       help='The name of the host'
+                       )
+    ghost.add_argument('-N', '--hostgroup',
+                       help='The name of the hostgroup'
+                       )
 
     # group service
     gservice = parser.add_mutually_exclusive_group()
-    gservice.add_argument('-s', '--service', type=str,
-        help='The name of the service'
-    )
-    gservice.add_argument('-S', '--servicegroup', type=str,
-        help='The name of the servicegroup'
-    )
+    gservice.add_argument('-s', '--service',
+                          help='The name of the service'
+                          )
+    gservice.add_argument('-S', '--servicegroup',
+                          help='The name of the servicegroup'
+                          )
 
     # general
-    parser.add_argument('-o', '--operation', type=str, default='list',
-        choices=['add', 'list', 'remove'],
-        help='Specify a operation, one of add, remove or list (default is list)'
-    )
+    parser.add_argument('-o', '--operation', default='list',
+                        choices=['add', 'list', 'remove'],
+                        help='Specify a operation, one of add, remove or list (default is list)'
+                        )
     gcomment = parser.add_mutually_exclusive_group()
-    gcomment.add_argument('-c', '--comment', type=str, default=None,
-        help='Descriptive comment for the downtime downtime'
-    )
+    gcomment.add_argument('-c', '--comment', default=None,
+                          help='Descriptive comment for the downtime downtime'
+                          )
     gcomment.add_argument('-i', '--ignore', action='store_true', default=False,
-        help='Bypass the comment argument, only available for the list argument'
-    )
-    parser.add_argument('-U', '--url', type=str,
-        default='http://localhost/cmk_master/check_mk/',
-        help='Base-URL of Multisite (default: guess local OMD site)'
-    )
-    parser.add_argument('-P', '--path', type=str,
-        default='/omd/sites',
-        help='The OMD base path (default: /omd/sites)'
-    )
+                          help='Bypass the comment argument, only available for the list argument'
+                          )
+    parser.add_argument('-U', '--url',
+                        default='http://localhost/cmk_master/check_mk/',
+                        help='Base-URL of Multisite (default: guess local OMD site)'
+                        )
+    parser.add_argument('-P', '--path',
+                        default='/omd/sites',
+                        help='The OMD base path (default: /omd/sites)'
+                        )
     parser.add_argument('-v', '--verbose', action='store_true',
-        help='Verbose output'
-    )
+                        help='Verbose output'
+                        )
 
     # Begin Time and Date
     parser.add_argument('-b', '--begin', type=validate_time,
-        default=datetime.now().strftime('%H:%M'),
-        help='Start time of the downtime (format: HH:MM, default: now)',
-    )
+                        default=datetime.now().strftime('%H:%M'),
+                        help='Start time of the downtime (format: HH:MM, default: now)',
+                        )
     parser.add_argument('-B', '--begindate', type=validate_date,
-        default=datetime.today().strftime('%d-%m-%Y'),
-        help='Start date of the downtime (format: dd-mm-yyyy, default: today)'
-    )
+                        default=datetime.today().strftime('%d-%m-%Y'),
+                        help='Start date of the downtime (format: dd-mm-yyyy, default: today)'
+                        )
 
     # End Time and Date
     parser.add_argument('-e', '--end', type=validate_time,
-        help='End time of the downtime (format: HH:MM)'
-    )
+                        help='End time of the downtime (format: HH:MM)'
+                        )
     parser.add_argument('-E', '--enddate', type=validate_date,
-        help='End date of the downtime, -E is ignored if -e is not set (format: dd-mm-yyyy)'
-    )
+                        help='End date of the downtime, -E is ignored if -e is not set (format: dd-mm-yyyy)'
+                        )
 
     # Duration
     parser.add_argument('-d', '--duration', type=int, default=7200,
-        help='Duration of the downtime in seconds, if -e is set, duration is ignored (default: 7200)'
-    )
+                        help='Duration of the downtime in seconds, if -e is set, duration is ignored (default: 7200)'
+                        )
 
     # Identification
-    parser.add_argument('-u', '--user', type=str, required=True,
-        help='Name of the automation user'
-    )
-    parser.add_argument('-p', '--secret', type=str, required=True,
-        help='Secret of the automation user'
-    )
+    parser.add_argument('-u', '--user', required=True,
+                        help='Name of the automation user'
+                        )
+    parser.add_argument('-p', '--secret', required=True,
+                        help='Secret of the automation user'
+                        )
     args = parser.parse_args(argv)
     logger.debug('Passed CLI arguments: %r', args)
 
@@ -1444,8 +1465,9 @@ def main(argv):
     # List, set or remove downtimes
     # List downtimes
     if args.operation == 'list':
-        if (args.ignore and len(sites.get_sites_with_data()) == 0) or (args.comment != None and len(sites.get_sites_with_data()) == 0):
-            downtime.list_downtimes(filter = False)
+        if (args.ignore and len(sites.get_sites_with_data()) == 0) or\
+                (args.comment is not None and len(sites.get_sites_with_data()) == 0):
+            downtime.list_downtimes(is_filter=False)
         else:
             downtime.list_downtimes()
 
@@ -1458,6 +1480,7 @@ def main(argv):
         downtime.remove_downtimes()
 
     return 0
+
 
 # ------------------------------------------------------------------------------
 #   Main
