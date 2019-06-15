@@ -68,6 +68,9 @@ if not os.path.exists(path_var_log):
 # ------------------------------------------------------------------------------
 #   Part            : Class definition
 # ------------------------------------------------------------------------------
+# TODO: Rethink the architecture of the classes
+# TODO: Make all comments python like
+# TODO: Add unit testing
 
 
 # ------------------------------------------------------------------------------
@@ -79,6 +82,7 @@ if not os.path.exists(path_var_log):
 #   Inherits from   : object
 # ------------------------------------------------------------------------------
 class Sites(object):
+    # TODO: Create method __iter__ and __next__ (Python 2 next()) to make the object iterable
     logger = None
 
     # --------------------------------------------------------------------------
@@ -130,6 +134,12 @@ class Sites(object):
                     self.logger.error('Livestatus socket not found: %s', socket_path)
             else:
                 self.logger.debug('Site %s is disabled', sitename)
+
+    def __iter__(self):
+        self.sites.
+
+    def __next__(self):
+        pass
 
     # --------------------------------------------------------------------------
     #   Method          : append_obj_to_site
@@ -193,6 +203,7 @@ class Sites(object):
 #   Inherits from   : object
 # ------------------------------------------------------------------------------
 class Site(object):
+    # TODO: Create method __iter__ and __next__ (Python 2 next()) to make the object iterable
     logger = None
 
     # --------------------------------------------------------------------------
@@ -1040,6 +1051,8 @@ class Downtime(object):
 #   Inherits from   : object
 # ------------------------------------------------------------------------------
 class Query(object):
+    # TODO: Add authentication to allow only permited user to set, remove or list downtimes
+    # TODO: Combine queries instead of per object querying
     logger = None
 
     # --------------------------------------------------------------------------
@@ -1212,6 +1225,7 @@ class Command(object):
 #   Return          : object        The reference to the logging object
 # ------------------------------------------------------------------------------
 def setup_logging(name):
+    # TODO: Create a class to be able to implement logging by assosation (has a)
     # setup of the log facility
     log = logging.getLogger(name)
     log.setLevel(logging.DEBUG)
@@ -1375,6 +1389,7 @@ def validate_args(args, sites):
 # ------------------------------------------------------------------------------
 def main(argv):
     parser = argparse.ArgumentParser()
+    # TODO: add argument for human readable (date format in list)
 
     # group host
     ghost = parser.add_mutually_exclusive_group()
