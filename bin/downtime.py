@@ -136,7 +136,7 @@ class Sites(object):
                 self.logger.debug('Site %s is disabled', sitename)
 
     def __iter__(self):
-        self.sites.
+        pass
 
     def __next__(self):
         pass
@@ -715,14 +715,17 @@ class Downtime(object):
     #                     author        A string with the user name
     #                     comment       A string with the comment for the down-
     #                                   time
+    #                     epoch         Show time fields in epoch instead human
+    #                                   readable
     #   Return          : -             N/A
     # --------------------------------------------------------------------------
-    def __init__(self, sites, author, comment=None):
+    def __init__(self, sites, author, comment=None, epoch=False):
         if Downtime.logger is None:
             Downtime.logger = setup_logging(self.__class__.__name__)
         self.sites = sites
         self.author = author
         self.comment = comment
+        self.epoch = epoch
         self.data = []
         self.dates = {
             'now': int(datetime.now().strftime('%s')),
@@ -799,7 +802,7 @@ class Downtime(object):
     #   Return          : -             N/A
     # --------------------------------------------------------------------------
     def list_downtimes(self, is_filter=True):
-        print "{0:8s} {1:10s} {2:20s} {3:40s} {4:10s} {5:10s} {6:10s} {7:6s} {8:80s}".format(
+        print "{0:8s} {1:10s} {2:20s} {3:40s} {4:19s} {5:19s} {6:10s} {7:6s} {8:80s}".format(
             self._lables[0],
             self._lables[1],
             self._lables[2],
@@ -861,13 +864,15 @@ class Downtime(object):
     def print_downtime(self, data, obj=None, connection=None):
         for line in data:
             if self.get_comment() is None or self.get_comment() == line[8].encode('utf-8'):
-                print "{0:8d} {1:10s} {2:20s} {3:40s} {4:10d} {5:10d} {6:10d} {7:6d} {8:80s}".format(
+                start_date = line[4] if self.epoch else str(datetime.fromtimestamp(line[4]))
+                end_date = line[5] if self.epoch else str(datetime.fromtimestamp(line[5]))
+                print "{0:8d} {1:10s} {2:20s} {3:40s} {4:19s} {5:19s} {6:10d} {7:6d} {8:80s}".format(
                     line[0],
                     line[1][:10].encode('utf-8'),
                     line[2][:20].encode('utf-8'),
                     line[3][:40].encode('utf-8'),
-                    line[4],
-                    line[5],
+                    start_date,
+                    end_date,
                     line[6],
                     line[7],
                     line[8][:80].encode('utf-8')
@@ -1225,7 +1230,7 @@ class Command(object):
 #   Return          : object        The reference to the logging object
 # ------------------------------------------------------------------------------
 def setup_logging(name):
-    # TODO: Create a class to be able to implement logging by assosation (has a)
+    # TODO: Create a class to be able to implement logging by association (has a)
     # setup of the log facility
     log = logging.getLogger(name)
     log.setLevel(logging.DEBUG)
@@ -1243,7 +1248,7 @@ def setup_logging(name):
     log_file = logging.FileHandler(path_var_log + "/downtime.log")
 
     # define log level for each handler
-    log_console.setLevel(logging.DEBUG)
+    log_console.setLevel(logging.INFO)
     log_file.setLevel(logging.DEBUG)
 
     # assign formatter to each handler
@@ -1389,7 +1394,9 @@ def validate_args(args, sites):
 # ------------------------------------------------------------------------------
 def main(argv):
     parser = argparse.ArgumentParser()
-    # TODO: add argument for human readable (date format in list)
+    # TODO: Add grouped_id argument to set an ID for this collection of downtime
+    # TODO: Add grouped_id random generator in case the id is not set
+    # TODO: Add exclude list as argument for host- and servicegroup
 
     # group host
     ghost = parser.add_mutually_exclusive_group()
@@ -1421,6 +1428,10 @@ def main(argv):
     gcomment.add_argument('-i', '--ignore', action='store_true', default=False,
                           help='Bypass the comment argument, only available for the list argument'
                           )
+    parser.add_argument('-C', '--epoch', action='store_true',
+                        default=False,
+                        help='Shows the listed downtimes in epoch instead of date and time (default: False)'
+                        )
     parser.add_argument('-U', '--url',
                         default='http://localhost/cmk_master/check_mk/',
                         help='Base-URL of Multisite (default: guess local OMD site)'
@@ -1470,7 +1481,7 @@ def main(argv):
     logger.debug('Collect and validate all passed data')
     sites = Sites(args.user, args.secret, args.path, args.url)
     logger.debug('Create downtime object')
-    downtime = Downtime(sites, args.user, args.comment)
+    downtime = Downtime(sites, args.user, args.comment, args.epoch)
     if args.operation == 'add' and not validate_downtime(args, downtime):
         logger.critical('Error in date and time arguments')
         return 1
@@ -1503,3 +1514,4 @@ def main(argv):
 if __name__ == '__main__':
     logger = setup_logging('main')
     sys.exit(main(sys.argv[1:]))
+
