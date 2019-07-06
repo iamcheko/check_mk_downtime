@@ -366,14 +366,15 @@ class Host(object):
     #                     obj           Optional a object reference
     #   Return          : -             N/A
     # --------------------------------------------------------------------------
-    @staticmethod
-    def get_data(connection, store_func, query_func, obj=None):
+    def get_data(self, connection, store_func, query_func, obj=None):
         if obj is None:
             data = connection.query_table(query_func())
+            if data:
+                store_func(self)
         else:
             data = connection.query_table(query_func(obj))
-        if data:
-            store_func(data, obj, connection)
+            if data:
+                store_func(data, obj, connection)
 
     # --------------------------------------------------------------------------
     #   Method          : get_filter_for_downtime
@@ -495,14 +496,15 @@ class Service(object):
     #                     obj           Optional a object reference
     #   Return          : -             N/A
     # --------------------------------------------------------------------------
-    @staticmethod
-    def get_data(connection, store_func, query_func, obj=None):
+    def get_data(self, connection, store_func, query_func, obj=None):
         if obj is None:
             data = connection.query_table(query_func())
+            if data:
+                store_func(self)
         else:
             data = connection.query_table(query_func(obj))
-        if data:
-            store_func(data, obj, connection)
+            if data:
+                store_func(data, obj, connection)
 
     # --------------------------------------------------------------------------
     #   Method          : get_filter_for_downtime
