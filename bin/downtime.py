@@ -69,35 +69,26 @@ if not os.path.exists(path_var_log):
 #   Part            : Class definition
 # ------------------------------------------------------------------------------
 # TODO: Rethink the architecture of the classes
-# TODO: Make all comments python like
 # TODO: Add unit testing
 
 
-# ------------------------------------------------------------------------------
-#   Class           : Sites
-# ------------------------------------------------------------------------------
-#   Description     : The Sites class stores all active check_mk sites in its
-#                     object.
-#
-#   Inherits from   : object
-# ------------------------------------------------------------------------------
 class Sites(object):
+    """
+    The Sites class stores all active check_mk sites in its object.
+    """
     # TODO: Create method __iter__ and __next__ (Python 2 next()) to make the object iterable
     logger = None
 
-    # --------------------------------------------------------------------------
-    #   Method          : __init__
-    # --------------------------------------------------------------------------
-    #   Description     : The Sites constructor method.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #                     user          The user name
-    #                     secret        The secret of the user
-    #                     path          The base path (OMD_ROOT)
-    #                     url           The url
-    #   Return          : -             N/A
-    # --------------------------------------------------------------------------
     def __init__(self, user, secret, path, url):
+        """
+        The constructor method for class Sites.
+
+        Attributes:
+            user        the name of the user
+            secret      the secret of the given user
+            path        the base path (OMD_ROOT)
+            url         the url
+        """
         if Sites.logger is None:
             Sites.logger = setup_logging(self.__class__.__name__)
         self.user = user
@@ -106,6 +97,7 @@ class Sites(object):
         self.url = url
         self.sites = {}
         self.sites_with_data = []
+        self.itter_idx = 0
         self.payload = {
             "action": 'get_site',
             "_username": self.user,
@@ -136,89 +128,87 @@ class Sites(object):
                 self.logger.debug('Site %s is disabled', sitename)
 
     def __iter__(self):
-        pass
+        """
+        The object iterator.
 
-    def __next__(self):
-        pass
+        Return:
+            obj         reference to its self
+        """
+        return self
 
-    # --------------------------------------------------------------------------
-    #   Method          : append_obj_to_site
-    # --------------------------------------------------------------------------
-    #   Description     : This method takes a obj of class host or service. It
-    #                     will find the site to which the obj is related and
-    #                     stores it to the evaluated site or sites.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #                     obj           The object of a class host or service
-    #   Return          : -             N/A
-    # --------------------------------------------------------------------------
+    def next(self):
+        """
+        The next method for the iterator.
+
+        Raises:
+            StopIteration
+
+        Return:
+            obj             reference to its self
+        """
+        if self.itter_idx <= len(self.sites_with_data):
+            self.itter_idx += 1
+            return self.sites_with_data[self.itter_idx - 1]
+        else:
+            raise StopIteration
+
     def append_obj_to_site(self, obj):
+        """
+        This method takes a obj of class host or service. It will find the site
+        to which the obj is related and stores it to the evaluated site or sites.
+
+        Attributes:
+            obj         a object of a class host or service
+        """
         for site in self.sites.keys():
             self.sites[site].validate_data(obj)
         self.collect_sites_with_data()
 
-    # --------------------------------------------------------------------------
-    #   Method          : collect_sites_with_data
-    # --------------------------------------------------------------------------
-    #   Description     : This method will find all sites that have valid data
-    #                     and store the site name in a list.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : -             N/A
-    # --------------------------------------------------------------------------
     def collect_sites_with_data(self):
+        """
+        This method will find all sites that have valid data and stores the site
+        name in a list.
+        """
         for site in self.sites.keys():
             if self.sites[site].has_data:
                 self.sites_with_data.append(site)
 
-    # --------------------------------------------------------------------------
-    #   Method          : get_sites
-    # --------------------------------------------------------------------------
-    #   Description     : This method returns all sites which are active.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : list          A list of all active sites
-    # --------------------------------------------------------------------------
     def get_sites(self):
+        """
+        This method returns all sites which are active.
+
+        Return:
+            list        a list of all active sites
+        """
         return self.sites.keys()
 
-    # --------------------------------------------------------------------------
-    #   Method          : get_sites_with_data
-    # --------------------------------------------------------------------------
-    #   Description     : This method returns all sites which have data.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : list          A list of all sites with data
-    # --------------------------------------------------------------------------
     def get_sites_with_data(self):
+        """
+        This method returns all sites which have data.
+
+        Return:
+             list       a list of all sites with data
+        """
         return self.sites_with_data
 
 
-# ------------------------------------------------------------------------------
-#   Class           : Site
-# ------------------------------------------------------------------------------
-#   Description     : The Site class represents all sites of a check_mk multi-
-#                     site environment.
-#
-#   Inherits from   : object
-# ------------------------------------------------------------------------------
 class Site(object):
+    """
+    The Site class represents all sites of a check_mk multisite environment.
+    """
     # TODO: Create method __iter__ and __next__ (Python 2 next()) to make the object iterable
     logger = None
 
-    # --------------------------------------------------------------------------
-    #   Method          : __init__
-    # --------------------------------------------------------------------------
-    #   Description     : The Site constructor method.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #                     sitename      A string with the site name
-    #                     alias         A string with the alias of the site
-    #                     socket        The filename with the absoluth path of
-    #                                   the livestatus socket
-    #   Return          : -             N/A
-    # --------------------------------------------------------------------------
     def __init__(self, sitename, alias, socket):
+        """
+        The constructor method for class Sites.
+
+        Attributes:
+            sitename    a string with the site name
+            alias       a string with the alias of the site
+            socket      the filename with the absolute path of the livestatus
+                        socket
+        """
         if Site.logger is None:
             Site.logger = setup_logging(self.__class__.__name__)
         self.sitename = sitename
@@ -229,144 +219,111 @@ class Site(object):
         self.logger.debug('Constructor call passed arguments sitename: %s, alias: %s, socket: %s',
                           self.sitename, self.alias, self.socket)
 
-    # --------------------------------------------------------------------------
-    #   Method          : get_sitename
-    # --------------------------------------------------------------------------
-    #   Description     : Getter method that returns the site name.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : string        The site name
-    # --------------------------------------------------------------------------
     def get_sitename(self):
+        """
+        Getter method that returns the site name.
+
+        Return:
+            string      returns the site name
+        """
         return self.sitename
 
-    # --------------------------------------------------------------------------
-    #   Method          : get_connection
-    # --------------------------------------------------------------------------
-    #   Description     : Returns the connection to the livestatus socket.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : filehandle    The filehandel to the livestatus socket
-    # --------------------------------------------------------------------------
     def get_connection(self):
+        """
+        Returns the connection to the livestatus socket.
+
+        Return:
+            filehandle  the filehandle to the lifestatus socket
+        """
         return self.connection
 
-    # --------------------------------------------------------------------------
-    #   Method          : validate_data
-    # --------------------------------------------------------------------------
-    #   Description     : This methode validates the data of the passed object.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #                     obj           The object that needs to be validated
-    #   Return          : -             N/A
-    # --------------------------------------------------------------------------
     def validate_data(self, obj):
+        """
+        This method validates the data of the passed object.
+
+        Arguments:
+            obj         the object that needs to be validated
+        """
         self.logger.debug('Validate data for site %s', self.get_sitename())
         obj.get_data(self.get_connection(), self.push, obj.get_query)
 
-    # --------------------------------------------------------------------------
-    #   Method          : push
-    # --------------------------------------------------------------------------
-    #   Description     : Pushes a object to the monitoring_objects list.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #                     obj           The object which is appended
-    #   Return          : -             N/A
-    # --------------------------------------------------------------------------
     def push(self, obj):
+        """
+        This method appends an obj to the monitored object list.
+        """
         self.monitoring_objects.append(obj)
 
-    # --------------------------------------------------------------------------
-    #   Method          : has_data
-    # --------------------------------------------------------------------------
-    #   Description     : Returns True if there is data in the object list or
-    #                     False if there is not.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : boolean       True if data is available else False
-    # --------------------------------------------------------------------------
     def has_data(self):
+        """
+        Returns True if there is data in the object list or False if there is
+        not.
+
+        Return:
+            boolean     True if data is available els False
+        """
         return True if len(self.monitoring_objects) > 0 else False
 
-    # --------------------------------------------------------------------------
-    #   Method          : get_monitoring_objects
-    # --------------------------------------------------------------------------
-    #   Description     : This is a generator methode which returns the list of
-    #                     monitoring_objects.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : obj           A object reference of Host or Service
-    # --------------------------------------------------------------------------
     def get_monitoring_objects(self):
+        """
+        This is a generator method which returns the list of monitoring_objects.
+
+        Return:
+            obj         an object reference of Host or Service
+        """
         for obj in self.monitoring_objects:
             yield obj
 
 
-# ------------------------------------------------------------------------------
-#   Class           : Host
-# ------------------------------------------------------------------------------
-#   Description     : The Host class represents a check_mk host.
-#
-#   Inherits from   : object
-# ------------------------------------------------------------------------------
 class Host(object):
+    """
+    The Host class represents a host in check_mk.
+    """
     logger = None
     _table = 'hosts'
     _columns = ['name']
 
-    # --------------------------------------------------------------------------
-    #   Method          : __init__
-    # --------------------------------------------------------------------------
-    #   Description     : The Host constructor method.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #                     host_name     A string with the host name
-    #   Return          : -             N/A
-    # --------------------------------------------------------------------------
     def __init__(self, host_name):
+        """
+        The constructor method for class Host.
+
+        Attributes:
+            host_name   a string with the name of the host
+        """
         if Host.logger is None:
             Host.logger = setup_logging(self.__class__.__name__)
         self.host_name = host_name
         self.logger.debug('Constructor call passed arguments host_name: %s', self.host_name)
 
-    # --------------------------------------------------------------------------
-    #   Method          : get_query
-    # --------------------------------------------------------------------------
-    #   Description     : This method returns the query for the listing of hosts
-    #                     in downtime.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : string        the query
-    # --------------------------------------------------------------------------
     def get_query(self):
+        """
+        This method returns the query for the listing of hosts in downtime.
+
+        Return:
+            string      returns a livestatus query string
+        """
         query = Query()
         return query.get_query(self._table, self._columns, {self._columns[0]: self.get_host_name()})
 
-    # --------------------------------------------------------------------------
-    #   Method          : get_host_name
-    # --------------------------------------------------------------------------
-    #   Description     : This method returns the host name of the Host object.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : string        The host name
-    # --------------------------------------------------------------------------
     def get_host_name(self):
+        """
+        This method returns the host name of the Host object.
+
+        Return:
+            string      returns a string with the host name
+        """
         return self.host_name
 
-    # --------------------------------------------------------------------------
-    #   Method          : get_data
-    # --------------------------------------------------------------------------
-    #   Description     : This method retrieves the data for a object and stores
-    #                     it.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #                     connection    The connection to the livestatus socket
-    #                     store_func    A reference to a method
-    #                     query_func    A reference to a method
-    #                     obj           Optional a object reference
-    #   Return          : -             N/A
-    # --------------------------------------------------------------------------
     def get_data(self, connection, store_func, query_func, obj=None):
+        """
+        This method retrieves the data for a object and stores it. If the object
+        isn't set all object will be received.
+
+        Attributes:
+            connection  the connection filehandle to the livestatus socket
+            store_func  a reference to a method
+            query_func  a reference to a method
+            obj         a object reference which is optional
+        """
         if obj is None:
             data = connection.query_table(query_func())
             if data:
@@ -376,68 +333,56 @@ class Host(object):
             if data:
                 store_func(data, obj, connection)
 
-    # --------------------------------------------------------------------------
-    #   Method          : get_filter_for_downtime
-    # --------------------------------------------------------------------------
-    #   Description     : This method returns the dictionary that is needed to
-    #                     generate the filter part of a query.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : dictionary    A dictionary for a filter
-    # --------------------------------------------------------------------------
     def get_filter_for_downtime(self):
+        """
+        This method returns the dictionary that is needed to generate the filter
+        part of a query.
+
+        Return:
+            dictionary  returns a dictionary for a filter
+        """
         return {'host_name': self.get_host_name()}
 
-    # --------------------------------------------------------------------------
-    #   Method          : get_as_a_string
-    # --------------------------------------------------------------------------
-    #   Description     : This method returns the hostname.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : string        The host name of the Host object
-    # --------------------------------------------------------------------------
     def get_as_a_string(self):
+        """
+        This method returns the hostname.
+
+        Return:
+            string      the host name of the host or service object
+        """
         return self.get_host_name()
 
-    # --------------------------------------------------------------------------
-    #   Method          : get_downtime_operation
-    # --------------------------------------------------------------------------
-    #   Description     : This method returns the operator for the downtime
-    #                     command.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #                     operator      schedule or something else
-    #   Return          : string        Nether SCHEDULE_HOST_DOWNTIME or
-    #                                   DEL_HOST_DOWNTIME
-    # --------------------------------------------------------------------------
     @staticmethod
     def get_downtime_operation(operator):
+        """
+        This method returns the operator for the downtime command.
+
+        Attributes:
+            operator    a string schedule to add a downtime every other string
+                        will return a delete operation
+
+        Return:
+            string      nether SCHEDULE_HOST_DOWNTIME or DEL_HOST_DOWNTIME
+        """
         return "SCHEDULE_HOST_DOWNTIME" if operator == 'schedule' else "DEL_HOST_DOWNTIME"
 
 
-# ------------------------------------------------------------------------------
-#   Class           : Service
-# ------------------------------------------------------------------------------
-#   Description     : The Service class represents a check_mk service.
-#
-#   Inherits from   : object
-# ------------------------------------------------------------------------------
-class Service(object):
+class Service(Host):
+    """
+    The Service class represents a check_mk service.
+    """
     logger = None
     _table = 'services'
     _columns = ['host_name', 'description']
 
-    # --------------------------------------------------------------------------
-    #   Method          : __init__
-    # --------------------------------------------------------------------------
-    #   Description     : The Service constructor method.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #                     host_name     A string with the host name
-    #                     service_name  A string with the service name
-    #   Return          : -             N/A
-    # --------------------------------------------------------------------------
     def __init__(self, host_name=None, service_name=None):
+        """
+        The constructor method for class Service.
+
+        Attributes:
+            host_name       a string with the name of the host
+            service_name    a string with the service name
+        """
         if Service.logger is None:
             Service.logger = setup_logging(self.__class__.__name__)
         self.host_name = host_name
@@ -445,172 +390,110 @@ class Service(object):
         self.logger.debug('Constructor call passed arguments host_name: %s, service_name: %s',
                           self.host_name, self.service_name)
 
-    # --------------------------------------------------------------------------
-    #   Method          : get_query
-    # --------------------------------------------------------------------------
-    #   Description     : This method returns the query for the listing of
-    #                     services in downtime.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : string        the query
-    # --------------------------------------------------------------------------
     def get_query(self):
+        """
+        This method returns the query for the listing of services in downtime.
+
+        Return:
+            string          a string with the livesstatus query
+        """
         query = Query()
         return query.get_query(self._table, self._columns, {self._columns[0]: self.get_host_name(),
                                                             self._columns[1]: self.get_service_name()})
 
-    # --------------------------------------------------------------------------
-    #   Method          : get_host_name
-    # --------------------------------------------------------------------------
-    #   Description     : This method returns the host name of the Service
-    #                     object.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : string        The host name
-    # --------------------------------------------------------------------------
-    def get_host_name(self):
-        return self.host_name
-
-    # --------------------------------------------------------------------------
-    #   Method          : get_service_name
-    # --------------------------------------------------------------------------
-    #   Description     : This method returns the service name of the Service
-    #                     object.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : string        The host name
-    # --------------------------------------------------------------------------
     def get_service_name(self):
+        """
+        This method returns the service name of the Service object.
+
+        Return:
+            string          a string with the service name
+        """
         return self.service_name
 
-    # --------------------------------------------------------------------------
-    #   Method          : get_data
-    # --------------------------------------------------------------------------
-    #   Description     : This method retrieves the data for a object and stores
-    #                     it.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #                     connection    The connection to the livestatus socket
-    #                     store_func    A reference to a method
-    #                     query_func    A reference to a method
-    #                     obj           Optional a object reference
-    #   Return          : -             N/A
-    # --------------------------------------------------------------------------
-    def get_data(self, connection, store_func, query_func, obj=None):
-        if obj is None:
-            data = connection.query_table(query_func())
-            if data:
-                store_func(self)
-        else:
-            data = connection.query_table(query_func(obj))
-            if data:
-                store_func(data, obj, connection)
-
-    # --------------------------------------------------------------------------
-    #   Method          : get_filter_for_downtime
-    # --------------------------------------------------------------------------
-    #   Description     : This method returns the dictionary that is needed to
-    #                     generate the filter part of a query.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : dictionary    A dictionary for a filter
-    # --------------------------------------------------------------------------
     def get_filter_for_downtime(self):
+        """
+        This method returns the dictionary that is needed to generate the filter
+        part of a query.
+
+        Return:
+            dictionary      a dictionary needed to build the filter for a
+                            livestatus query
+        """
         return {'host_name': self.get_host_name(), 'service_description': self.get_service_name()}
 
-    # --------------------------------------------------------------------------
-    #   Method          : get_as_a_string
-    # --------------------------------------------------------------------------
-    #   Description     : This method returns the hostname and service.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : string        The host and service name of the Service
-    #                                   object
-    # --------------------------------------------------------------------------
     def get_as_a_string(self):
+        """
+        This method returns the hostname and service.
+
+        Return:
+            string          the host and service name of the Service object
+        """
         return "{0};{1}".format(self.get_host_name(), self.get_service_name())
 
-    # --------------------------------------------------------------------------
-    #   Method          : get_downtime_operation
-    # --------------------------------------------------------------------------
-    #   Description     : This method returns the operator for the downtime
-    #                     command.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #                     operator      schedule or something else
-    #   Return          : string        Nether SCHEDULE_SVC_DOWNTIME or
-    #                                   DEL_SVC_DOWNTIME
-    # --------------------------------------------------------------------------
     @staticmethod
     def get_downtime_operation(operator):
+        """
+        This method returns the operator for the downtime command.
+
+        Attributes:
+            operator        expects schedule to add a downtime or it will delete
+                            an existing scheduled downtime
+
+        Return:
+            string          Nether SCHEDULE_SVC_DOWNTIME or DEL_SVC_DOWNTIME
+        """
         return "SCHEDULE_SVC_DOWNTIME" if operator == 'schedule' else "DEL_SVC_DOWNTIME"
 
 
-# ------------------------------------------------------------------------------
-#   Class           : Hostgroup
-# ------------------------------------------------------------------------------
-#   Description     : The Hostgroup class receives a servicegroup name and
-#                     creates for each host of this group a object of a
-#                     Host class.
-#
-#   Inherits from   : object
-# ------------------------------------------------------------------------------
 class Hostgroup(object):
+    """
+    The Hostgroup class receives a hostgroup name and creates for each host of
+    this group a object of a Host class.
+    """
     logger = None
     _table = 'hostgroups'
     _columns = ['members']
 
-    # --------------------------------------------------------------------------
-    #   Method          : __init__
-    # --------------------------------------------------------------------------
-    #   Description     : The Hostgroup constructor method.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #                     hostgroup     A string with the name of the hosgroup
-    #   Return          : -             N/A
-    # --------------------------------------------------------------------------
-    def __init__(self, hostgroup):
+    def __init__(self, name):
+        """
+        The constructor method for class Hostgroup.
+
+        Attributes:
+            hostgroup       a string with the name of the hostgroup
+        """
         if Hostgroup.logger is None:
             Hostgroup.logger = setup_logging(self.__class__.__name__)
-        self.hostgroup = hostgroup
-        self.logger.debug('Constructor call passed arguments hostgroup: %s', self.hostgroup)
+        self.name = name
+        self.logger.debug('Constructor call passed arguments %s: %s', Hostgroup._table, self.name)
 
-    # --------------------------------------------------------------------------
-    #   Method          : get_query
-    # --------------------------------------------------------------------------
-    #   Description     : A getter method to retrieve the query.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : string        The query string
-    # --------------------------------------------------------------------------
     def get_query(self):
+        """
+        A getter method to retrieve the query.
+
+        Return:
+            string          the query sring for livestatus
+        """
         query = Query()
-        return query.get_query(self._table, self._columns, {'name': self.get_hostgroup()})
+        return query.get_query(self._table, self._columns, {'name': self.get_name()})
 
-    # --------------------------------------------------------------------------
-    #   Method          : get_hostgroup
-    # --------------------------------------------------------------------------
-    #   Description     : A getter method to retrieve the name of the hostgroup.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : string        A string with the hostgroup name
-    # --------------------------------------------------------------------------
-    def get_hostgroup(self):
-        return self.hostgroup
+    def get_name(self):
+        """
+        A getter method to retrieve the name of the hostgroup.
 
-    # --------------------------------------------------------------------------
-    #   Method          : get_data
-    # --------------------------------------------------------------------------
-    #   Description     : This method retrieves the data for a object and stores
-    #                     it.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #                     connection    The connection to the livestatus socket
-    #                     store_func    A reference to a method
-    #                     query_func    Not used but needed
-    #   Return          : -             N/A
-    # --------------------------------------------------------------------------
+        Return:
+            string          a string with the hostgroup name
+        """
+        return self.name
+
     def get_data(self, connection, store_func, query_func=None):
+        """
+        This method retrieves the data for a object and stores it.
+
+        Attributes:
+            connection      the connection to the livestatus socket
+            store_func      a reference to a method
+            query_func      not used but needed
+        """
         data = connection.query_table(self.get_query())
         if data:
             for data_set in data[0][0]:
@@ -618,72 +501,35 @@ class Hostgroup(object):
                 store_func(obj)
 
 
-# ------------------------------------------------------------------------------
-#   Class           : Servicegroup
-# ------------------------------------------------------------------------------
-#   Description     : The Servicegroup class receives a servicegroup name and
-#                     creates for each service of this group a object of a
-#                     Service class.
-#
-#   Inherits from   : object
-# ------------------------------------------------------------------------------
-class Servicegroup(object):
+class Servicegroup(Hostgroup):
+    """
+    The Servicegroup class receives a servicegroup name and creates for each
+    service of this group a object of a Service class.
+    """
     logger = None
     _table = 'servicegroups'
     _columns = ['members']
 
-    # --------------------------------------------------------------------------
-    #   Method          : __init__
-    # --------------------------------------------------------------------------
-    #   Description     : The Servicegroup constructor method.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #                     servicegroup  A string with the name of the servicegroup
-    #   Return          : -             N/A
-    # --------------------------------------------------------------------------
-    def __init__(self, servicegroup):
+    def __init__(self, name):
+        """
+        The constructor method for class Servicegroup.
+
+        Attributes:
+            servicegroup    a string with the name of the servicegroup
+        """
         if Servicegroup.logger is None:
             Servicegroup.logger = setup_logging(self.__class__.__name__)
-        self.servicegroup = servicegroup
-        self.logger.debug('Constructor call passed arguments servicegroup: %s', self.servicegroup)
+        self.name = name
+        self.logger.debug('Constructor call passed arguments %s: %s', Servicegroup._table, self.name)
 
-    # --------------------------------------------------------------------------
-    #   Method          : get_query
-    # --------------------------------------------------------------------------
-    #   Description     : A getter method to retrieve the query.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : string        The query string
-    # --------------------------------------------------------------------------
-    def get_query(self):
-        query = Query()
-        return query.get_query(self._table, self._columns, {'name': self.get_servicegroup()})
-
-    # --------------------------------------------------------------------------
-    #   Method          : get_servicegroup
-    # --------------------------------------------------------------------------
-    #   Description     : A getter method to retrieve the name of the service-
-    #                     group.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : string        A string with the servicegroup name
-    # --------------------------------------------------------------------------
-    def get_servicegroup(self):
-        return self.servicegroup
-
-    # --------------------------------------------------------------------------
-    #   Method          : get_data
-    # --------------------------------------------------------------------------
-    #   Description     : This method retrieves the data for a object and stores
-    #                     it.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #                     connection    The connection to the livestatus socket
-    #                     store_func    A reference to a method
-    #                     query_func    Not used but needed
-    #   Return          : -             N/A
-    # --------------------------------------------------------------------------
     def get_data(self, connection, store_func, query_func=None):
+        """
+        This method retrieves the data for a object and stores it.
+
+        connection          the connection to the livestatus socket
+        store_func          a reference to a method
+        query_func          not used but needed
+        """
         data = connection.query_table(self.get_query())
         if data:
             for data_set in data[0][0]:
@@ -691,37 +537,28 @@ class Servicegroup(object):
                 store_func(obj)
 
 
-# ------------------------------------------------------------------------------
-#   Class           : Downtime
-# ------------------------------------------------------------------------------
-#   Description     : The Downtime class lists or removes existing or adds new
-#                     downtimes. Important is, the comment ist the key to select
-#                     the downtimes to remove.
-#
-#   Inherits from   : object
-# ------------------------------------------------------------------------------
 class Downtime(object):
+    """
+    The Downtime class lists or removes existing or adds new downtimes.
+    Important is, the comment ist the key to select the downtimes to remove.
+    """
     logger = None
     _table = 'downtimes'
     _columns = ['id', 'author', 'host_name', 'service_description', 'start_time',
                 'end_time', 'duration', 'fixed', 'comment']
     _lables = ['ID', 'Author', 'Hostname', 'Servicename', 'Start', 'End', 'Duration', 'Fixed', 'Comment']
 
-    # --------------------------------------------------------------------------
-    #   Method          : __init__
-    # --------------------------------------------------------------------------
-    #   Description     : The Downtime constructor method.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #                     sites         A Sites object reference
-    #                     author        A string with the user name
-    #                     comment       A string with the comment for the down-
-    #                                   time
-    #                     epoch         Show time fields in epoch instead human
-    #                                   readable
-    #   Return          : -             N/A
-    # --------------------------------------------------------------------------
     def __init__(self, sites, author, comment=None, epoch=False):
+        """
+        The constructor method for class Downtime.
+
+        Attributes:
+            sites           a object reference of class Sites
+            author          a string with the name of the author
+            comment         a comment string for the downtime
+            epoch           show time representations in epoch instead of human
+                            readable
+        """
         if Downtime.logger is None:
             Downtime.logger = setup_logging(self.__class__.__name__)
         self.sites = sites
@@ -738,72 +575,60 @@ class Downtime(object):
         self.logger.debug('Constructor call passed arguments sites (keys): %s, author: %s, comment: %s',
                           self.sites.sites.keys(), self.author, self.comment)
 
-    # --------------------------------------------------------------------------
-    #   Method          : _request_object
-    # --------------------------------------------------------------------------
-    #   Description     : This is a generator method. It loops through all sites
-    #                     that contain data and returns the site and the object.
-    #                     group.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : site          A string with the site name
-    #                     obj           A object reference of Host or Service
-    # --------------------------------------------------------------------------
     def _request_objects(self):
+        """
+        This is a generator method. It loops through all sites that contain data
+        and returns the site name and the object reference of class Host or Service
+
+        Return:
+            site            a string with the site name
+            obj             a object reference of class Host or Service
+        """
         for site in self.sites.get_sites_with_data():
             for obj in self.sites.sites[site].get_monitoring_objects():
                 self.logger.debug('Found object on site %s: discovered data is %s', site, obj.get_as_a_string())
                 yield site, obj
 
-    # --------------------------------------------------------------------------
-    #   Method          : get_data
-    # --------------------------------------------------------------------------
-    #   Description     : This method retrieves the data for a object and stores
-    #                     it.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #                     connection    The connection to the livestatus socket
-    #                     store_func    A reference to a method
-    #                     query_func    Not used but needed
-    #   Return          : -             N/A
-    # --------------------------------------------------------------------------
     def get_data(self, connection, store_func, query_func):
+        """
+        This method retrieves the data for a object and stores it.
+
+        Attributes:
+            connection      the connection to the livestatus socket
+            store_func      a reference to a method
+            query_func      not used but needed
+        """
         self.logger.debug('Querying livestatus query: %s', query_func())
         data = connection.query_table(query_func())
         if data:
             self.logger.debug('Retrieved data: %s', data)
             store_func(data)
 
-    # --------------------------------------------------------------------------
-    #   Method          : get_query
-    # --------------------------------------------------------------------------
-    #   Description     : A getter method to retrieve the query. If object is
-    #                     specified a livestatus filter gets also returned.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #                     obj           A object reference of Host or Service
-    #   Return          : string        The query string
-    # --------------------------------------------------------------------------
     def get_query(self, obj=None):
+        """
+        A getter method to retrieve the query. If object is specified a
+        livestatus filter gets also returned.
+
+        Attributes:
+            obj             a object reference of Host or Service
+
+        Return:
+            string          a string with the query for livestatus
+        """
         query = Query()
         if obj is None:
             return query.get_query(self._table, self._columns)
         else:
             return query.get_query(self._table, self._columns, obj.get_filter_for_downtime())
 
-    # --------------------------------------------------------------------------
-    #   Method          : list_downtimes
-    # --------------------------------------------------------------------------
-    #   Description     : This method queries livestatus and passes the result
-    #                     to a print method. If the optional filter is not given
-    #                     all downtimes get retrieved.
-    #                     optional.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #                     filter        A boolean, ether True or False
-    #   Return          : -             N/A
-    # --------------------------------------------------------------------------
     def list_downtimes(self, is_filter=True):
+        """
+        This method queries livestatus and passes the result to a print method.
+        If the optional filter is not given all downtimes get retrieved.
+
+        Attributes:
+            is_filter       a boolean True if a filter has been provided
+        """
         print "{0:8s} {1:10s} {2:20s} {3:40s} {4:19s} {5:19s} {6:10s} {7:6s} {8:80s}".format(
             self._lables[0],
             self._lables[1],
@@ -822,48 +647,32 @@ class Downtime(object):
             for site in self.sites.get_sites():
                 self.get_data(self.sites.sites[site].get_connection(), self.print_downtime, self.get_query)
 
-    # --------------------------------------------------------------------------
-    #   Method          : add_downtimes
-    # --------------------------------------------------------------------------
-    #   Description     : This method sends commands to livestatus to add the
-    #                     requested downtimes.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : -             N/A
-    # --------------------------------------------------------------------------
     def add_downtimes(self):
+        """
+        This method sends commands to livestatus to add the requested downtimes.
+        """
         for site, obj in self._request_objects():
             cmd = Command()
             self.sites.sites[site].get_connection().command(cmd.add_downtime(obj, self))
 
-    # --------------------------------------------------------------------------
-    #   Method          : remove_downtimes
-    # --------------------------------------------------------------------------
-    #   Description     : This method sends commands to livestatus to evaluate
-    #                     the downtime id and creates and executes the command
-    #                     to remove the specified downtime.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : -             N/A
-    # --------------------------------------------------------------------------
     def remove_downtimes(self):
+        """
+        This method sends commands to livestatus to evaluate the downtime id and
+        creates and executes the command to remove the specified downtime.
+        """
         for site, obj in self._request_objects():
             obj.get_data(self.sites.sites[site].get_connection(), self.exec_comand, self.get_query, obj)
 
-    # --------------------------------------------------------------------------
-    #   Method          : print_downtime
-    # --------------------------------------------------------------------------
-    #   Description     : This method prints all retrieved data if comment is
-    #                     None or the comment of the downtime matches the
-    #                     comment passed to the programm.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #                     data          A list of lists
-    #                     obj           Optional and not used
-    #                     connection    Optional and not used
-    #   Return          : -             N/A
-    # --------------------------------------------------------------------------
     def print_downtime(self, data, obj=None, connection=None):
+        """
+        This method prints all retrieved data if comment is None or the comment
+        of the downtime matches the comment passed to the programm.
+
+        Attributes:
+            data            a list of lists returnd from livestatus
+            obj             optional
+            connection      optional
+        """
         for line in data:
             if self.get_comment() is None or self.get_comment() == line[8].encode('utf-8'):
                 start_date = line[4] if self.epoch else str(datetime.fromtimestamp(line[4]))
@@ -880,215 +689,165 @@ class Downtime(object):
                     line[8][:80].encode('utf-8')
                 )
 
-    # --------------------------------------------------------------------------
-    #   Method          : exec_command
-    # --------------------------------------------------------------------------
-    #   Description     : This method executes a command if the comment passed
-    #                     by data matches the comment stored in this object.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #                     data          A list of lists
-    #                     obj           the object of which the downtime might
-    #                                   be removed
-    #                     connection    The connecten to livestatus
-    #   Return          : -             N/A
-    # --------------------------------------------------------------------------
     def exec_comand(self, data, obj, connection):
+        """
+        This method executes a command if the comment passed by data matches the
+        comment stored in this object.
+
+        Attributes:
+            data            a list of lists from livestatus
+            obj             the object reference of type Host or Service from
+                            which the downtime shall be removed
+            connection      the connection to livestatus
+        """
         # Compare the comment
         if data[0][8] == self.get_comment():
             cmd = Command()
             connection.command(cmd.remove_downtime(obj, data, self))
 
-    # --------------------------------------------------------------------------
-    #   Method          : get_author
-    # --------------------------------------------------------------------------
-    #   Description     : Getter method, returns the author.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : string        The user name
-    # --------------------------------------------------------------------------
     def get_author(self):
+        """
+        Getter method, returns the author.
+
+        Return:
+            string          a string with the user name
+        """
         return self.author
 
-    # --------------------------------------------------------------------------
-    #   Method          : get_comment
-    # --------------------------------------------------------------------------
-    #   Description     : Getter method, returns the downtime comment.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : string        The comment
-    # --------------------------------------------------------------------------
     def get_comment(self):
+        """
+        Getter method, returns the downtime comment.
+
+        Return:
+            string          the comment string
+        """
         return self.comment
 
-    # --------------------------------------------------------------------------
-    #   Method          : get_now
-    # --------------------------------------------------------------------------
-    #   Description     : Getter method, returns the actual date if available
-    #                     for the downtime object.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : int           Date as unix epoch time else None
-    # --------------------------------------------------------------------------
     def get_now(self):
+        """
+        Getter method, returns the actual date if available for the downtime
+        object.
+
+        Return:
+            int             the date as Unix epoch time
+        """
         return self.dates['now'] if self.dates['now'] else None
 
-    # --------------------------------------------------------------------------
-    #   Method          : get_start_time
-    # --------------------------------------------------------------------------
-    #   Description     : Getter method, returns the start time for the downtime
-    #                     object.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : int           Date as unix epoch time else None
-    # --------------------------------------------------------------------------
     def get_start_time(self):
+        """
+        Getter method, returns the start time for the downtime object.
+
+        Return:
+            int             the date as Unix epoch time or None
+        """
         return self.dates['start_time'] if self.dates['start_time'] else None
 
-    # --------------------------------------------------------------------------
-    #   Method          : set_start_time
-    # --------------------------------------------------------------------------
-    #   Description     : Setter method, retrieves the start time.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #                     start_time    Date in unix epoch time
-    #   Return          : -             N/A
-    # --------------------------------------------------------------------------
     def set_start_time(self, start_time):
+        """
+        Setter method, retrieves the start time.
+
+        Attributes:
+            start_time      the start time as Unix epoch time
+        """
         self.dates['start_time'] = int(start_time)
         self.logger.debug('Setting downtime start time to: %d', self.dates['start_time'])
 
-    # --------------------------------------------------------------------------
-    #   Method          : get_end_time
-    # --------------------------------------------------------------------------
-    #   Description     : Getter method, returns the end time for the downtime
-    #                     object.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : int           Date as unix epoch time else None
-    # --------------------------------------------------------------------------
     def get_end_time(self):
+        """
+        Getter method, returns the end time for the downtime object.
+
+        Return:
+            int             the date as Unix epoch time or None
+        """
         return self.dates['end_time'] if self.dates['end_time'] else None
 
-    # --------------------------------------------------------------------------
-    #   Method          : set_end_time
-    # --------------------------------------------------------------------------
-    #   Description     : Setter method, retrieves the end time.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #                     end_time      Date in unix epoch time
-    #   Return          : -             N/A
-    # --------------------------------------------------------------------------
     def set_end_time(self, end_time):
+        """
+        Setter method, retrieves the end time.
+
+        Attributes:
+            end_time        the end time as Unix epoch time
+        """
         self.dates['end_time'] = int(end_time)
         self.logger.debug('Setting downtime end time to: %d', self.dates['end_time'])
 
-    # --------------------------------------------------------------------------
-    #   Method          : get_duration
-    # --------------------------------------------------------------------------
-    #   Description     : Getter method, returns the duration in second for the
-    #                     downtime object.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : int           Date as unix epoch time else None
-    # --------------------------------------------------------------------------
     def get_duration(self):
+        """
+        Getter method, returns the duration in second for the downtime object.
+
+        Return:
+            int             the time in seconds between the start and end date
+        """
         return self.dates['duration'] if self.dates['duration'] else None
 
-    # --------------------------------------------------------------------------
-    #   Method          : set_duration
-    # --------------------------------------------------------------------------
-    #   Description     : Setter method, retrieves the duration of the downtime.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #                     duration      Duration in seconds
-    #   Return          : -             N/A
-    # --------------------------------------------------------------------------
     def set_duration(self, duration):
+        """
+        Setter method, retrieves the duration of the downtime.
+
+        Attributes:
+            duration        the duration of the downtime in seconds
+        """
         self.dates['duration'] = int(duration)
         self.logger.debug('Setting downtime duration to: %d', self.dates['duration'])
 
-    # --------------------------------------------------------------------------
-    #   Method          : calculate_end_time
-    # --------------------------------------------------------------------------
-    #   Description     : If start time and duration is given, this method
-    #                     calculates the end time.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : -             N/A
-    # --------------------------------------------------------------------------
     def calculate_end_time(self):
+        """
+        If start time and duration is given, this method calculates the end time.
+        """
         self.set_end_time(self.get_start_time() + self.get_duration())
         self.logger.debug('Calculating downtime end time')
 
-    # --------------------------------------------------------------------------
-    #   Method          : calculate_duration
-    # --------------------------------------------------------------------------
-    #   Description     : If start time and end time is given, this method
-    #                     calculates the duration.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : -             N/A
-    # --------------------------------------------------------------------------
     def calculate_duration(self):
+        """
+        If start time and end time is given, this method calculates the duration.
+        :return:
+        """
         self.set_duration(self.get_start_time() - self.get_end_time())
         self.logger.debug('Calculating downtime duration')
 
-    # --------------------------------------------------------------------------
-    #   Method          : validate_dates
-    # --------------------------------------------------------------------------
-    #   Description     : This method validates the given dates on
-    #                     plausibility.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : boolean       True if plausible else False
-    # --------------------------------------------------------------------------
     def validate_dates(self):
+        """
+        This method validates the given dates on plausibility.
+
+        Return:
+            boolean         True if date is valid else False
+        """
         self.logger.debug('Validate downtime: %d < %d and %d > %d', self.get_start_time(),
                           self.get_end_time(), self.get_end_time(), self.get_now())
         return True if self.get_start_time() < self.get_end_time() and self.get_end_time() > self.get_now() else False
 
 
-# ------------------------------------------------------------------------------
-#   Class           : Query
-# ------------------------------------------------------------------------------
-#   Description     : The Query class receives a bunch of arguments and creates
-#                     a livestatus query out of it.
-#
-#   Inherits from   : object
-# ------------------------------------------------------------------------------
 class Query(object):
+    """
+    The Query class receives a bunch of arguments and creates a livestatus query
+    out of it.
+    """
     # TODO: Add authentication to allow only permited user to set, remove or list downtimes
     # TODO: Combine queries instead of per object querying
     logger = None
 
-    # --------------------------------------------------------------------------
-    #   Method          : __init__
-    # --------------------------------------------------------------------------
-    #   Description     : The Query constructor method.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : -             N/A
-    # --------------------------------------------------------------------------
     def __init__(self):
+        """
+        The constructor method for class Query.
+        """
         if Query.logger is None:
             Query.logger = setup_logging(self.__class__.__name__)
 
-    # --------------------------------------------------------------------------
-    #   Method          : get_query
-    # --------------------------------------------------------------------------
-    #   Description     : The method creates a query string with all the
-    #                     received arguments. Then it returns the created query.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #                     table         The name of the livestatus table.
-    #                     columns       The requested columns.
-    #                     filter        Optional a dictionary of key value pairs
-    #                                   to form the Filter. The key has to be a
-    #                                   valid column name of the queried table
-    #   Return          : string        The query string
-    # --------------------------------------------------------------------------
     def get_query(self, table, columns, is_filter=None):
+        """
+        The method creates a query string with all the received arguments. Then
+        it returns the created query.
+
+        Attributes:
+            table           the name of the livestatus table
+            columns         the requested columns
+            is_filter       optional a dictionary of key value pairs to form the
+                            Filter. The key has to be a valid column name of the
+                            queried table
+
+        Return:
+            string          the query string for livestatus
+        """
         query = "GET {0}{1}{2}".format(
             table,
             self._columns(columns),
@@ -1096,36 +855,31 @@ class Query(object):
         self.logger.debug('Livestatus query: %s', ' - '.join(query.split('\n')))
         return query
 
-    # --------------------------------------------------------------------------
-    #   Method          : _columns
-    # --------------------------------------------------------------------------
-    #   Description     : If the passed columns list is not empty, this method
-    #                     will join all columns with a space and return it.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #                     columns       The requested columns.
-    #   Return          : string        The query string
-    # --------------------------------------------------------------------------
     @staticmethod
     def _columns(columns):
+        """
+        If the passed columns list is not empty, this method will join all
+        columns with a space and return it.
+
+        Attributes:
+            columns         the requested columns
+
+        Return:
+            string          a query string for livestatus
+        """
         if columns is None:
             return ""
         else:
             return "\nColumns: " + " ".join(columns)
 
-    # --------------------------------------------------------------------------
-    #   Method          : _filter
-    # --------------------------------------------------------------------------
-    #   Description     : This methode creates a query filter. The key has to
-    #                     be one of the column names of the queried table.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #                     filter        A dictionary of column: requested value
-    #                                   pairs
-    #   Return          : string        The query string
-    # --------------------------------------------------------------------------
     @staticmethod
     def _filter(a_filter):
+        """
+        This methode creates a query filter. The key has to be one of the column
+        names of the queried table.
+        Attributes:
+            a_filter        a dictionary of column: requested value pairs
+        """
         string = ""
 
         if a_filter is None:
@@ -1142,44 +896,32 @@ class Query(object):
         return string
 
 
-# ------------------------------------------------------------------------------
-#   Class           : Command
-# ------------------------------------------------------------------------------
-#   Description     : This class mainly creates a livestatus command which can
-#                     be passed to the command method of the livestatus module.
-#
-#   Inherits from   : object
-# ------------------------------------------------------------------------------
 class Command(object):
+    """
+    This class creates mainly a livestatus command which can be passed to the
+    command method of the livestatus module.
+    """
     logger = None
 
-    # --------------------------------------------------------------------------
-    #   Method          : __init__
-    # --------------------------------------------------------------------------
-    #   Description     : The Command constructor method.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #   Return          : -             N/A
-    # --------------------------------------------------------------------------
     def __init__(self):
+        """
+        The constructor method for class Command.
+        """
         if Command.logger is None:
             Command.logger = setup_logging(self.__class__.__name__)
 
-    # --------------------------------------------------------------------------
-    #   Method          : add_downtime
-    # --------------------------------------------------------------------------
-    #   Description     : The method creates a command string with the settings
-    #                     of the passed object references to add a downtime for
-    #                     a Host or Service object.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #                     obj           A reference to a object of class Host or
-    #                                   Service
-    #                     downtime      A reference to a object of class
-    #                                   Downtime
-    #   Return          : command       The created command string
-    # --------------------------------------------------------------------------
     def add_downtime(self, obj, downtime):
+        """
+        The method creates a command string with the settings of the passed
+        object references to add a downtime for a Host or Service object.
+
+        Attributes:
+            obj         a reference to a object of class Host or Service
+            downtime    a reference to the downtime object
+
+        Return:
+            string      the created livestatus command string
+        """
         command = "[" + str(downtime.get_now()) + "] "
         command += obj.get_downtime_operation('schedule') + ";"
         command += obj.get_as_a_string() + ";"
@@ -1192,22 +934,20 @@ class Command(object):
 
         return command
 
-    # --------------------------------------------------------------------------
-    #   Method          : remove_downtime
-    # --------------------------------------------------------------------------
-    #   Description     : The method creates a command string with the settings
-    #                     of the passed object references to remove a downtime
-    #                     for a Host or Service object.
-    #
-    #   Arguments       : self          A reference to the object itself
-    #                     obj           A reference to a object of class Host or
-    #                                   Service
-    #                     data          A list reference with information to a
-    #                                   specific obj, where data[0][0] holds
-    #                                   the needed downtime id
-    #   Return          : command       The created command string
-    # --------------------------------------------------------------------------
     def remove_downtime(self, obj, data, downtime):
+        """
+        The method creates a command string with the settings of the passed
+        object references to remove a downtime for a Host or Service object.
+
+        Attribute:
+            obj         a reference to a object of class Host or Service
+            data        a list reference with informations to a specific object
+                        where data[0][0] has the needed downtime id
+            downtime    a reference to the downtime object
+
+        Return:
+            string      the created livestatus command string
+        """
         command = "[{0}] {1};{2}\n".format(
             str(downtime.get_now()),
             obj.get_downtime_operation('remove'),
@@ -1221,17 +961,17 @@ class Command(object):
 #   Part            : Main Body
 # ------------------------------------------------------------------------------
 
-# ------------------------------------------------------------------------------
-#   Function        : setup_logging
-# ------------------------------------------------------------------------------
-#   Description     : This function allows to setup the logging facility for
-#                     main and all inline classes the same but also take the
-#                     class name as the logger.
-#
-#   Arguments       : name          The name of the logger
-#   Return          : object        The reference to the logging object
-# ------------------------------------------------------------------------------
 def setup_logging(name):
+    """
+    This function allows to setup the logging facility for main and all inline
+    classes the same but also take the class name as the logger.
+
+    Attribute:
+        name        the name of the logger
+
+    Return:
+        object      a reference to a logging object
+    """
     # TODO: Create a class to be able to implement logging by association (has a)
     # setup of the log facility
     log = logging.getLogger(name)
@@ -1264,17 +1004,18 @@ def setup_logging(name):
     return log
 
 
-# ------------------------------------------------------------------------------
-#   Function        : validate_downtime
-# ------------------------------------------------------------------------------
-#   Description     : Validate the start- end enddate of the downtime. The
-#                     results get stored in a Downtime object.
-#
-#   Arguments       : args          All given command line arguments
-#                     sites         A reference to the MultiSite Class
-#   Return          : boolean       True if all went fine else False
-# ------------------------------------------------------------------------------
 def validate_downtime(args, downtime):
+    """
+    This function validates the start- and enddate and time of the downtime. The
+    result gets stored in the passed downtime object.
+
+    Attributes:
+        args        all passed command line arguments
+        downtime    a reference to a downtime object
+
+    Return:
+        boolean     True if all went fine else False
+    """
     # Check argument combination for the dates
     # -b and -B (mandatory)
     downtime.set_start_time(datetime.strptime(args.begindate + " " + args.begin,
@@ -1302,16 +1043,19 @@ def validate_downtime(args, downtime):
     return downtime.validate_dates()
 
 
-# ------------------------------------------------------------------------------
-#   Function        : validate_date
-# ------------------------------------------------------------------------------
-#   Description     : Validate a date string past as command line argument.
-#                     This function is only used in the argparse part.
-#
-#   Arguments       : date          Date string
-#   Return          : date          The validated string
-# ------------------------------------------------------------------------------
 def validate_date(date):
+    """
+    This function validates the passed date argument.
+
+    Raises:
+        ArgumentTypeError
+
+    Attribute:
+        time        the date string
+
+    Return:
+        string      a valid date string
+    """
     try:
         logger.debug('Valid date: %s', datetime.strptime(date, "%d-%m-%Y").strftime("%d-%m-%Y"))
         return datetime.strptime(date, "%d-%m-%Y").strftime("%d-%m-%Y")
@@ -1321,16 +1065,19 @@ def validate_date(date):
         raise argparse.ArgumentTypeError(msg)
 
 
-# ------------------------------------------------------------------------------
-#   Function        : validate_time
-# ------------------------------------------------------------------------------
-#   Description     : Validate a time string passed as command line argument.
-#                     This function is only used in the argparse part.
-#
-#   Arguments       : time          Time string
-#   Return          : time          The validated string
-# ------------------------------------------------------------------------------
 def validate_time(time):
+    """
+    This function validates the passed time argument.
+
+    Raises:
+        ArgumentTypeError
+
+    Attribute:
+        time        the time string
+
+    Return:
+        string      a valid time string
+    """
     try:
         logger.debug('Valid time: %s', datetime.strptime(time, "%H:%M").strftime("%H:%M"))
         return datetime.strptime(time, "%H:%M").strftime("%H:%M")
@@ -1340,17 +1087,19 @@ def validate_time(time):
         raise argparse.ArgumentTypeError(msg)
 
 
-# ------------------------------------------------------------------------------
-#   Function        : validate_args
-# ------------------------------------------------------------------------------
-#   Description     : Validate all arguments and store the data into the related
-#                     class object.
-#
-#   Arguments       : args          Arguments passed by commandline
-#                     sites         Reference to the Sites object
-#   Return          : boolean       True if okay else False
-# ------------------------------------------------------------------------------
 def validate_args(args, sites):
+    """
+    This function will prepare relevant arguments like the passed host, service,
+    hostgroup and servicegroup. It creates the related objects and store the
+    validated data into it.
+
+    Attributes:
+        args        the relevant arguments passed by command line
+        sites       a reference to a class Sites object
+
+    Return:
+        boolean     True if all went well else False
+    """
 
     # only a host and service is given
     if args.service and args.host:
@@ -1385,16 +1134,16 @@ def validate_args(args, sites):
     return True
 
 
-# ------------------------------------------------------------------------------
-#   Function        : main
-# ------------------------------------------------------------------------------
-#   Description     : Parse the given command line arguments and create a nice
-#                     formatted help output if requested.
-#
-#   Arguments       : argv          The argument list
-#   Return          : int           0 if everything went fine else 1
-# ------------------------------------------------------------------------------
 def main(argv):
+    """
+    Parse the given command line arguments and create a nice formatted help
+    output if requested.
+
+    Attributes:
+        argv        the argument list passed on the command line
+    Return:
+        int         0 if everything went fine else 1
+    """
     parser = argparse.ArgumentParser()
     # TODO: Add grouped_id argument to set an ID for this collection of downtime
     # TODO: Add grouped_id random generator in case the id is not set
