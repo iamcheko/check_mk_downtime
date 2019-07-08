@@ -76,7 +76,6 @@ class Sites(object):
     """
     The Sites class stores all active check_mk sites in its object.
     """
-    # TODO: Create method __iter__ and __next__ (Python 2 next()) to make the object iterable
     logger = None
 
     def __init__(self, user, secret, path, url):
