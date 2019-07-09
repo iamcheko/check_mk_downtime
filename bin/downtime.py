@@ -1181,7 +1181,6 @@ def main(argv):
         int         0 if everything went fine else 1
     """
     parser = argparse.ArgumentParser()
-    # TODO: Add grouped_id argument to set an ID for this collection of downtime
     # TODO: Add grouped_id random generator in case the id is not set
     # TODO: Add exclude list as argument for host- and servicegroup
 
