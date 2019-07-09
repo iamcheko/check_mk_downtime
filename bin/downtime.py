@@ -76,7 +76,6 @@ class Sites(object):
     """
     The Sites class stores all active check_mk sites in its object.
     """
-    # TODO: Create method __iter__ and __next__ (Python 2 next()) to make the object iterable
     logger = None
 
     def __init__(self, user, secret, path, url):
@@ -546,16 +545,17 @@ class Downtime(object):
     _table = 'downtimes'
     _columns = ['id', 'author', 'host_name', 'service_description', 'start_time',
                 'end_time', 'duration', 'fixed', 'comment']
-    _lables = ['ID', 'Author', 'Hostname', 'Servicename', 'Start', 'End', 'Duration', 'Fixed', 'Comment']
+    _lables = ['ID', 'Grouped ID', 'Author', 'Hostname', 'Servicename', 'Start', 'End', 'Duration', 'Fixed', 'Comment']
 
-    def __init__(self, sites, author, comment=None, epoch=False):
+    def __init__(self, sites, author, comment=None, groupedid=None, epoch=False):
         """
         The constructor method for class Downtime.
 
         Attributes:
             sites           a object reference of class Sites
             author          a string with the name of the author
-            comment         a comment string for the downtime
+            comment         a descriptive text to explain the reason for the downtime
+            groupedid       a groupedid string for the downtime
             epoch           show time representations in epoch instead of human
                             readable
         """
@@ -564,6 +564,7 @@ class Downtime(object):
         self.sites = sites
         self.author = author
         self.comment = comment
+        self.groupedid = groupedid
         self.epoch = epoch
         self.data = []
         self.dates = {
@@ -572,8 +573,8 @@ class Downtime(object):
             'end_time': None,
             'duration': None,
         }
-        self.logger.debug('Constructor call passed arguments sites (keys): %s, author: %s, comment: %s',
-                          self.sites.sites.keys(), self.author, self.comment)
+        self.logger.debug('Constructor call passed arguments sites (keys): %s, author: %s, groupedid: %s',
+                          self.sites.sites.keys(), self.author, self.groupedid)
 
     def _request_objects(self):
         """
@@ -629,7 +630,7 @@ class Downtime(object):
         Attributes:
             is_filter       a boolean True if a filter has been provided
         """
-        print "{0:8s} {1:10s} {2:20s} {3:40s} {4:19s} {5:19s} {6:10s} {7:6s} {8:80s}".format(
+        print "{0:8s} {1:12} {2:10s} {3:20s} {4:40s} {5:19s} {6:19s} {7:10s} {8:6s} {9:80s}".format(
             self._lables[0],
             self._lables[1],
             self._lables[2],
@@ -638,7 +639,8 @@ class Downtime(object):
             self._lables[5],
             self._lables[6],
             self._lables[7],
-            self._lables[8]
+            self._lables[8],
+            self._lables[9]
         )
         if is_filter:
             for site, obj in self._request_objects():
@@ -665,8 +667,8 @@ class Downtime(object):
 
     def print_downtime(self, data, obj=None, connection=None):
         """
-        This method prints all retrieved data if comment is None or the comment
-        of the downtime matches the comment passed to the programm.
+        This method prints all retrieved data if groupedid is None or the groupedid
+        of the downtime matches the groupedid passed to the programm.
 
         Attributes:
             data            a list of lists returnd from livestatus
@@ -674,11 +676,13 @@ class Downtime(object):
             connection      optional
         """
         for line in data:
-            if self.get_comment() is None or self.get_comment() == line[8].encode('utf-8'):
+            if self.get_groupedid() is None or self.get_groupedid() in line[8].encode('utf-8'):
                 start_date = line[4] if self.epoch else str(datetime.fromtimestamp(line[4]))
                 end_date = line[5] if self.epoch else str(datetime.fromtimestamp(line[5]))
-                print "{0:8d} {1:10s} {2:20s} {3:40s} {4:19s} {5:19s} {6:10d} {7:6d} {8:80s}".format(
+                cmt, sep, groupedid = line[8].encode('utf-8').partition(' ID:')
+                print "{0:8d} {1:12s} {2:10s} {3:20s} {4:40s} {5:19s} {6:19s} {7:10d} {8:6d} {9:80s}".format(
                     line[0],
+                    groupedid,
                     line[1][:10].encode('utf-8'),
                     line[2][:20].encode('utf-8'),
                     line[3][:40].encode('utf-8'),
@@ -686,7 +690,7 @@ class Downtime(object):
                     end_date,
                     line[6],
                     line[7],
-                    line[8][:80].encode('utf-8')
+                    cmt
                 )
 
     def exec_comand(self, data, obj, connection):
@@ -700,8 +704,8 @@ class Downtime(object):
                             which the downtime shall be removed
             connection      the connection to livestatus
         """
-        # Compare the comment
-        if data[0][8] == self.get_comment():
+        # See if comment contains the groupedid
+        if self.get_groupedid() in data[0][8]:
             cmd = Command()
             connection.command(cmd.remove_downtime(obj, data, self))
 
@@ -716,12 +720,21 @@ class Downtime(object):
 
     def get_comment(self):
         """
-        Getter method, returns the downtime comment.
+        Getter method, returns the descriptive text for the reason of the downtime.
 
         Return:
             string          the comment string
         """
         return self.comment
+
+    def get_groupedid(self):
+        """
+        Getter method, returns the downtime groupedid.
+
+        Return:
+            string          the groupedid string
+        """
+        return self.groupedid
 
     def get_now(self):
         """
@@ -926,10 +939,11 @@ class Command(object):
         command += obj.get_downtime_operation('schedule') + ";"
         command += obj.get_as_a_string() + ";"
         command += str(downtime.get_start_time()) + ";"
-        command += str(downtime.get_end_time()) + ";0;0;"
+        command += str(downtime.get_end_time()) + ";1;0;"
         command += str(downtime.get_duration()) + ";"
         command += downtime.get_author() + ";"
-        command += downtime.get_comment() + "\n"
+        command += downtime.get_comment() + " "
+        command += downtime.get_groupedid() + "\n"
         self.logger.debug('Livestatus command: COMMAND %s', command)
 
         return command
@@ -1086,6 +1100,28 @@ def validate_time(time):
         logger.critical(msg)
         raise argparse.ArgumentTypeError(msg)
 
+def validate_groupedid(groupedid):
+    """
+    This function validates the passed groupedid argument. Gropedid needs to be
+    a string of digits.
+
+    Raises:
+        ArgumentTypeError
+
+    Attribute:
+        groupedid   the groupedid string
+
+    Return:
+        string      a valid groupedid string
+    """
+    string = ""
+    try:
+        logger.debug('Valid groupedid: %d', int(groupedid[:12]))
+        return 'ID:{0:012d}'.format(int(groupedid[:12]))
+    except ValueError:
+        msg = "Groupedid has to be a valid integer: '{0}'.".format(groupedid)
+        logger.critical(msg)
+        raise argparse.ArgumentTypeError(msg)
 
 def validate_args(args, sites):
     """
@@ -1145,7 +1181,6 @@ def main(argv):
         int         0 if everything went fine else 1
     """
     parser = argparse.ArgumentParser()
-    # TODO: Add grouped_id argument to set an ID for this collection of downtime
     # TODO: Add grouped_id random generator in case the id is not set
     # TODO: Add exclude list as argument for host- and servicegroup
 
@@ -1172,12 +1207,15 @@ def main(argv):
                         choices=['add', 'list', 'remove'],
                         help='Specify a operation, one of add, remove or list (default is list)'
                         )
-    gcomment = parser.add_mutually_exclusive_group()
-    gcomment.add_argument('-c', '--comment', default=None,
+    parser.add_argument('-c', '--comment', default=None,
                           help='Descriptive comment for the downtime downtime'
                           )
-    gcomment.add_argument('-i', '--ignore', action='store_true', default=False,
-                          help='Bypass the comment argument, only available for the list argument'
+    ggroupedid = parser.add_mutually_exclusive_group(required=True)
+    ggroupedid.add_argument('-g', '--groupedid', type=validate_groupedid,
+                          help='Provide an ID to identify the group of hosts and services'
+                          )
+    ggroupedid.add_argument('-i', '--ignore', action='store_true', default=False,
+                          help='Bypass the groupedid argument, only available for the list argument'
                           )
     parser.add_argument('-C', '--epoch', action='store_true',
                         default=False,
@@ -1232,7 +1270,7 @@ def main(argv):
     logger.debug('Collect and validate all passed data')
     sites = Sites(args.user, args.secret, args.path, args.url)
     logger.debug('Create downtime object')
-    downtime = Downtime(sites, args.user, args.comment, args.epoch)
+    downtime = Downtime(sites, args.user, args.comment, args.groupedid, args.epoch)
     if args.operation == 'add' and not validate_downtime(args, downtime):
         logger.critical('Error in date and time arguments')
         return 1
@@ -1243,7 +1281,7 @@ def main(argv):
     # List downtimes
     if args.operation == 'list':
         if (args.ignore and len(sites.get_sites_with_data()) == 0) or\
-                (args.comment is not None and len(sites.get_sites_with_data()) == 0):
+                (args.groupedid is not None and len(sites.get_sites_with_data()) == 0):
             downtime.list_downtimes(is_filter=False)
         else:
             downtime.list_downtimes()
