@@ -939,7 +939,7 @@ class Command(object):
         command += obj.get_downtime_operation('schedule') + ";"
         command += obj.get_as_a_string() + ";"
         command += str(downtime.get_start_time()) + ";"
-        command += str(downtime.get_end_time()) + ";0;0;"
+        command += str(downtime.get_end_time()) + ";1;0;"
         command += str(downtime.get_duration()) + ";"
         command += downtime.get_author() + ";"
         command += downtime.get_comment() + " "
@@ -1116,8 +1116,8 @@ def validate_groupedid(groupedid):
     """
     string = ""
     try:
-        logger.debug('Valid groupedid: %d', int(groupedid))
-        return 'ID:{0:012d}'.format(int(groupedid))
+        logger.debug('Valid groupedid: %d', int(groupedid[:12]))
+        return 'ID:{0:012d}'.format(int(groupedid[:12]))
     except ValueError:
         msg = "Groupedid has to be a valid integer: '{0}'.".format(groupedid)
         logger.critical(msg)
