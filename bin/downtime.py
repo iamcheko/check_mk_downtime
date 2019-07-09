@@ -545,7 +545,7 @@ class Downtime(object):
     _table = 'downtimes'
     _columns = ['id', 'author', 'host_name', 'service_description', 'start_time',
                 'end_time', 'duration', 'fixed', 'comment']
-    _lables = ['ID', 'Author', 'Hostname', 'Servicename', 'Start', 'End', 'Duration', 'Fixed', 'Comment']
+    _lables = ['ID', 'Grouped ID', 'Author', 'Hostname', 'Servicename', 'Start', 'End', 'Duration', 'Fixed', 'Comment']
 
     def __init__(self, sites, author, comment=None, groupedid=None, epoch=False):
         """
@@ -630,7 +630,7 @@ class Downtime(object):
         Attributes:
             is_filter       a boolean True if a filter has been provided
         """
-        print "{0:8s} {1:10s} {2:20s} {3:40s} {4:19s} {5:19s} {6:10s} {7:6s} {8:80s}".format(
+        print "{0:8s} {1:12} {2:10s} {3:20s} {4:40s} {5:19s} {6:19s} {7:10s} {8:6s} {9:80s}".format(
             self._lables[0],
             self._lables[1],
             self._lables[2],
@@ -639,7 +639,8 @@ class Downtime(object):
             self._lables[5],
             self._lables[6],
             self._lables[7],
-            self._lables[8]
+            self._lables[8],
+            self._lables[9]
         )
         if is_filter:
             for site, obj in self._request_objects():
@@ -678,8 +679,10 @@ class Downtime(object):
             if self.get_groupedid() is None or self.get_groupedid() in line[8].encode('utf-8'):
                 start_date = line[4] if self.epoch else str(datetime.fromtimestamp(line[4]))
                 end_date = line[5] if self.epoch else str(datetime.fromtimestamp(line[5]))
-                print "{0:8d} {1:10s} {2:20s} {3:40s} {4:19s} {5:19s} {6:10d} {7:6d} {8:80s}".format(
+                cmt, sep, groupedid = line[8].encode('utf-8').partition(' ID:')
+                print "{0:8d} {1:12s} {2:10s} {3:20s} {4:40s} {5:19s} {6:19s} {7:10d} {8:6d} {9:80s}".format(
                     line[0],
+                    groupedid,
                     line[1][:10].encode('utf-8'),
                     line[2][:20].encode('utf-8'),
                     line[3][:40].encode('utf-8'),
@@ -687,7 +690,7 @@ class Downtime(object):
                     end_date,
                     line[6],
                     line[7],
-                    line[8][:80].encode('utf-8')
+                    cmt
                 )
 
     def exec_comand(self, data, obj, connection):
