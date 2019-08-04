@@ -58,11 +58,10 @@ global logger
 
 # build the working environment
 path_bin = os.path.dirname(os.path.realpath(__file__))
-path_base = os.path.dirname(path_bin)
-path_etc = os.path.join(path_base, 'etc')
+path_base = os.environ['HOME']
 path_var_log = os.path.join(path_base, 'var/log')
 if not os.path.exists(path_var_log):
-    os.mkdir(path_var_log)
+    os.makedirs(path_var_log)
 
 
 # ------------------------------------------------------------------------------
@@ -117,7 +116,14 @@ class Sites(object):
             if site_struct['result_code'] == 0 and site_struct['result']['site_config']['disabled'] is False:
                 self.logger.debug('Site %s is enabled', sitename)
                 socket_path = self.path + "/" + sitename + "/tmp/run/live"
-                if os.path.exists(socket_path):
+                if 'socket' in site_struct['result']['site_config'].keys():
+                    socket_host = site_struct['result']['site_config']['socket'][1]['socket'][0]
+                    socket_port = str(site_struct['result']['site_config']['socket'][1]['socket'][1])
+                if socket_host and socket_port:
+                    self.logger.debug('Livestatus tcp socket found: %s:%s', socket_host, socket_port)
+                    self.sites[sitename] = Site(sitename, site_struct['result']['site_config']['alias'],
+                                                "tcp:" + socket_host + ":" + socket_port)
+                elif os.path.exists(socket_path):
                     self.logger.debug('Livestatus socket found: %s', socket_path)
                     self.sites[sitename] = Site(sitename, site_struct['result']['site_config']['alias'],
                                                 "unix:" + socket_path)
