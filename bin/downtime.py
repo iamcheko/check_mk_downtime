@@ -450,6 +450,7 @@ class Service(Host):
         return "SCHEDULE_SVC_DOWNTIME" if operator == 'schedule' else "DEL_SVC_DOWNTIME"
 
 
+
 class Hostgroup(object):
     """
     The Hostgroup class receives a hostgroup name and creates for each host of
@@ -534,6 +535,62 @@ class Servicegroup(Hostgroup):
         connection          the connection to the livestatus socket
         store_func          a reference to a method
         query_func          not used but needed
+        """
+        data = connection.query_table(self.get_query())
+        if data:
+            for data_set in data[0][0]:
+                obj = Service(data_set[0], data_set[1])
+                store_func(obj)
+
+
+class HostInclude(Servicegroup):
+    """
+    The HostInclude class receives a hostname and creates for each service that belong to that hsot
+    object of a Service class.
+    """
+    logger = None
+    _table = 'hosts'
+    _columns = ['services']
+
+    def __init__(self, name):
+        """
+        The constructor method for class HostInclude.
+
+        Attributes:
+            host            a string with the name of the host
+        """
+        if HostInclude.logger is None:
+            HostInclude.logger = setup_logging(self.__class__.__name__)
+        self.name = name
+        self.logger.debug('Constructor call passed arguments %s: %s', HostInclude._table, self.name)
+
+    def get_query(self):
+        """
+        A getter method to retrieve the query.
+
+        Return:
+            string          the query sring for livestatus
+        """
+        query = Query()
+        return query.get_query(self._table, self._columns, {'name': self.get_name()})
+
+    def get_name(self):
+        """
+        A getter method to retrieve the name of the hostgroup.
+
+        Return:
+            string          a string with the hostgroup name
+        """
+        return self.name
+
+    def get_data(self, connection, store_func, query_func=None):
+        """
+        This method retrieves the data for a object and stores it.
+
+        Attributes:
+            connection      the connection to the livestatus socket
+            store_func      a reference to a method
+            query_func      not used but needed
         """
         data = connection.query_table(self.get_query())
         if data:
@@ -1154,6 +1211,8 @@ def validate_args(args, sites):
     # only a host is given
     elif args.host:
         for h in args.host.split(','):
+            if not args.exclusive:
+                obj = HostInclude(h)
             obj = Host(h)
             sites.append_obj_to_site(obj)
     # only a hostgroup is given
@@ -1198,6 +1257,10 @@ def main(argv):
     ghost.add_argument('-N', '--hostgroup',
                        help='The name of the hostgroup'
                        )
+    # just host no services
+    parser.add_argument('-x', '--exclusive', action='store_true',
+                        help='Just define downtime for the host without services'
+                        )
 
     # group service
     gservice = parser.add_mutually_exclusive_group()
@@ -1309,4 +1372,3 @@ def main(argv):
 if __name__ == '__main__':
     logger = setup_logging('main')
     sys.exit(main(sys.argv[1:]))
-
