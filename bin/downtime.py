@@ -503,6 +503,7 @@ class Hostgroup(object):
         data = connection.query_table(self.get_query())
         if data:
             for data_set in data[0][0]:
+                self.logger.debug('Received data - Host: %s', data_set)
                 obj = Host(data_set)
                 store_func(obj)
 
@@ -539,30 +540,31 @@ class Servicegroup(Hostgroup):
         data = connection.query_table(self.get_query())
         if data:
             for data_set in data[0][0]:
+                self.logger.debug('Received data - Host: %s Service: %s', data_set[0], data_set[1])
                 obj = Service(data_set[0], data_set[1])
                 store_func(obj)
 
 
-class HostInclude(Servicegroup):
+class ServicesIncluded(Servicegroup):
     """
-    The HostInclude class receives a hostname and creates for each service that belong to that hsot
+    The ServicesIncluded class receives a hostname and creates for each service that belong to that hsot
     object of a Service class.
     """
     logger = None
     _table = 'hosts'
-    _columns = ['services']
+    _columns = ['name', 'services']
 
     def __init__(self, name):
         """
-        The constructor method for class HostInclude.
+        The constructor method for class ServicesIncluded.
 
         Attributes:
             host            a string with the name of the host
         """
-        if HostInclude.logger is None:
-            HostInclude.logger = setup_logging(self.__class__.__name__)
+        if ServicesIncluded.logger is None:
+            ServicesIncluded.logger = setup_logging(self.__class__.__name__)
         self.name = name
-        self.logger.debug('Constructor call passed arguments %s: %s', HostInclude._table, self.name)
+        self.logger.debug('Constructor call passed arguments %s: %s', ServicesIncluded._table, self.name)
 
     def get_query(self):
         """
@@ -594,9 +596,11 @@ class HostInclude(Servicegroup):
         """
         data = connection.query_table(self.get_query())
         if data:
-            for data_set in data[0][0]:
-                obj = Service(data_set[0], data_set[1])
-                store_func(obj)
+            for data_set in data:
+                for service in data_set[1]:
+                    self.logger.debug('Received data - Host: %s Service: %s', data_set[0], service)
+                    obj = Service(data_set[0], service)
+                    store_func(obj)
 
 
 class Downtime(object):
@@ -768,9 +772,10 @@ class Downtime(object):
             connection      the connection to livestatus
         """
         # See if comment contains the groupedid
-        if self.get_groupedid() in data[0][8]:
-            cmd = Command()
-            connection.command(cmd.remove_downtime(obj, data, self))
+        for data_set in data:
+            if self.get_groupedid() in data[0][8]:
+                cmd = Command()
+                connection.command(cmd.remove_downtime(obj, data, self))
 
     def get_author(self):
         """
@@ -1212,7 +1217,8 @@ def validate_args(args, sites):
     elif args.host:
         for h in args.host.split(','):
             if not args.exclusive:
-                obj = HostInclude(h)
+                obj = ServicesIncluded(h)
+                sites.append_obj_to_site(obj)
             obj = Host(h)
             sites.append_obj_to_site(obj)
     # only a hostgroup is given
@@ -1372,3 +1378,4 @@ def main(argv):
 if __name__ == '__main__':
     logger = setup_logging('main')
     sys.exit(main(sys.argv[1:]))
+
