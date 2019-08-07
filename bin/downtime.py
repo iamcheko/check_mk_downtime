@@ -342,11 +342,13 @@ class Host(object):
         """
         This method returns the dictionary that is needed to generate the filter
         part of a query.
+        The service_description is needed, since without, the generated query will
+        return all related services to the host, which leads to duplicates.
 
         Return:
             dictionary  returns a dictionary for a filter
         """
-        return {'host_name': self.get_host_name()}
+        return {'host_name': self.get_host_name(), 'service_description': ''}
 
     def get_as_a_string(self):
         """
@@ -540,31 +542,31 @@ class Servicegroup(Hostgroup):
         data = connection.query_table(self.get_query())
         if data:
             for data_set in data[0][0]:
-                self.logger.debug('Received data - Host: %s Service: %s', data_set[0], data_set[1])
                 obj = Service(data_set[0], data_set[1])
                 store_func(obj)
 
 
-class ServicesIncluded(Servicegroup):
+class HostAndServices(Servicegroup):
     """
-    The ServicesIncluded class receives a hostname and creates for each service that belong to that hsot
+    The HostAndServices class receives a hostname and creates for each service that belong to that hsot
     object of a Service class.
     """
     logger = None
     _table = 'hosts'
     _columns = ['name', 'services']
 
-    def __init__(self, name):
+    def __init__(self, name, exclusive=True):
         """
-        The constructor method for class ServicesIncluded.
+        The constructor method for class HostAndServices.
 
         Attributes:
             host            a string with the name of the host
         """
-        if ServicesIncluded.logger is None:
-            ServicesIncluded.logger = setup_logging(self.__class__.__name__)
+        if HostAndServices.logger is None:
+            HostAndServices.logger = setup_logging(self.__class__.__name__)
         self.name = name
-        self.logger.debug('Constructor call passed arguments %s: %s', ServicesIncluded._table, self.name)
+        self.exclusive = exclusive
+        self.logger.debug('Constructor call passed arguments %s: %s', HostAndServices._table, self.name)
 
     def get_query(self):
         """
@@ -596,11 +598,14 @@ class ServicesIncluded(Servicegroup):
         """
         data = connection.query_table(self.get_query())
         if data:
-            for data_set in data:
-                for service in data_set[1]:
-                    self.logger.debug('Received data - Host: %s Service: %s', data_set[0], service)
-                    obj = Service(data_set[0], service)
-                    store_func(obj)
+            for host_name, services in data:
+                obj = Host(host_name)
+                store_func(obj)
+                if not self.exclusive:
+                    for service in services:
+                        self.logger.debug('Received data - Host: %s Service: %s', host_name, service)
+                        obj = Service(host_name, service)
+                        store_func(obj)
 
 
 class Downtime(object):
@@ -773,9 +778,9 @@ class Downtime(object):
         """
         # See if comment contains the groupedid
         for data_set in data:
-            if self.get_groupedid() in data[0][8]:
+            if self.get_groupedid() in data_set[8]:
                 cmd = Command()
-                connection.command(cmd.remove_downtime(obj, data, self))
+                connection.command(cmd.remove_downtime(obj, data_set[0], self))
 
     def get_author(self):
         """
@@ -933,7 +938,7 @@ class Query(object):
             table,
             self._columns(columns),
             self._filter(is_filter))
-        self.logger.debug('Livestatus query: %s', ' - '.join(query.split('\n')))
+        self.logger.debug('Livestatus query: %s', ';'.join(query.split('\n')))
         return query
 
     @staticmethod
@@ -1016,7 +1021,7 @@ class Command(object):
 
         return command
 
-    def remove_downtime(self, obj, data, downtime):
+    def remove_downtime(self, obj, dtid, downtime):
         """
         The method creates a command string with the settings of the passed
         object references to remove a downtime for a Host or Service object.
@@ -1033,7 +1038,7 @@ class Command(object):
         command = "[{0}] {1};{2}\n".format(
             str(downtime.get_now()),
             obj.get_downtime_operation('remove'),
-            str(data[0][0]))
+            str(dtid))
         self.logger.debug('Livestatus command: COMMAND %s', command)
 
         return command
@@ -1204,7 +1209,6 @@ def validate_args(args, sites):
     Return:
         boolean     True if all went well else False
     """
-
     # only a host and service is given
     if args.service and args.host:
         # Generator to create all posible combinations of host and service
@@ -1216,10 +1220,7 @@ def validate_args(args, sites):
     # only a host is given
     elif args.host:
         for h in args.host.split(','):
-            if not args.exclusive:
-                obj = ServicesIncluded(h)
-                sites.append_obj_to_site(obj)
-            obj = Host(h)
+            obj = HostAndServices(h, args.exclusive)
             sites.append_obj_to_site(obj)
     # only a hostgroup is given
     elif args.hostgroup:
