@@ -55,6 +55,8 @@ import requests
 # ------------------------------------------------------------------------------
 # make logging facility globally available
 global logger
+# enable restricted access for users
+AUTH_ENABLED = False
 
 # build the working environment
 path_bin = os.path.dirname(os.path.realpath(__file__))
@@ -77,20 +79,18 @@ class Sites(object):
     """
     logger = None
 
-    def __init__(self, user, secret, path, url):
+    def __init__(self, auth, path, url):
         """
         The constructor method for class Sites.
 
         Attributes:
-            user        the name of the user
-            secret      the secret of the given user
+            auth        the user credentials
             path        the base path (OMD_ROOT)
             url         the url
         """
         if Sites.logger is None:
             Sites.logger = setup_logging(self.__class__.__name__)
-        self.user = user
-        self.secret = secret
+        self.auth = auth
         self.path = path
         self.url = url
         self.sites = {}
@@ -98,14 +98,14 @@ class Sites(object):
         self.itter_idx = 0
         self.payload = {
             "action": 'get_site',
-            "_username": self.user,
-            "_secret": self.secret,
+            "_username": self.auth.get_user(),
+            "_secret": self.auth.get_secret(),
             "output_format": 'python',
             "site_id": '',
         }
 
         self.logger.debug('Constructor call passed arguments user: %s, path: %s, url: %s',
-                          self.user, self.path, self.url)
+                          self.auth.get_user(), self.path, self.url)
         for sitename in os.listdir(self.path):
             self.payload["site_id"] = sitename
             self.logger.debug('Collecting informations for site %s', sitename)
@@ -287,7 +287,7 @@ class Host(object):
     _table = 'hosts'
     _columns = ['name']
 
-    def __init__(self, host_name):
+    def __init__(self, host_name, auth):
         """
         The constructor method for class Host.
 
@@ -297,6 +297,7 @@ class Host(object):
         if Host.logger is None:
             Host.logger = setup_logging(self.__class__.__name__)
         self.host_name = host_name
+        self.auth = auth
         self.logger.debug('Constructor call passed arguments host_name: %s', self.host_name)
 
     def get_query(self):
@@ -307,7 +308,7 @@ class Host(object):
             string      returns a livestatus query string
         """
         query = Query()
-        return query.get_query(self._table, self._columns, {self._columns[0]: self.get_host_name()})
+        return query.get_query(self.auth, self._table, self._columns, {self._columns[0]: self.get_host_name()})
 
     def get_host_name(self):
         """
@@ -382,7 +383,7 @@ class Service(Host):
     _table = 'services'
     _columns = ['host_name', 'description']
 
-    def __init__(self, host_name=None, service_name=None):
+    def __init__(self, host_name, service_name, auth):
         """
         The constructor method for class Service.
 
@@ -394,6 +395,7 @@ class Service(Host):
             Service.logger = setup_logging(self.__class__.__name__)
         self.host_name = host_name
         self.service_name = service_name
+        self.auth = auth
         self.logger.debug('Constructor call passed arguments host_name: %s, service_name: %s',
                           self.host_name, self.service_name)
 
@@ -405,7 +407,7 @@ class Service(Host):
             string          a string with the livesstatus query
         """
         query = Query()
-        return query.get_query(self._table, self._columns, {self._columns[0]: self.get_host_name(),
+        return query.get_query(self.auth, self._table, self._columns, {self._columns[0]: self.get_host_name(),
                                                             self._columns[1]: self.get_service_name()})
 
     def get_service_name(self):
@@ -462,16 +464,18 @@ class Hostgroup(object):
     _table = 'hostgroups'
     _columns = ['members']
 
-    def __init__(self, name):
+    def __init__(self, name, auth):
         """
         The constructor method for class Hostgroup.
 
         Attributes:
             hostgroup       a string with the name of the hostgroup
+            auth            the user credentials
         """
         if Hostgroup.logger is None:
             Hostgroup.logger = setup_logging(self.__class__.__name__)
         self.name = name
+        self.auth = auth
         self.logger.debug('Constructor call passed arguments %s: %s', Hostgroup._table, self.name)
 
     def get_query(self):
@@ -482,7 +486,7 @@ class Hostgroup(object):
             string          the query sring for livestatus
         """
         query = Query()
-        return query.get_query(self._table, self._columns, {'name': self.get_name()})
+        return query.get_query(self.auth, self._table, self._columns, {'name': self.get_name()})
 
     def get_name(self):
         """
@@ -504,9 +508,9 @@ class Hostgroup(object):
         """
         data = connection.query_table(self.get_query())
         if data:
-            for data_set in data[0][0]:
-                self.logger.debug('Received data - Host: %s', data_set)
-                obj = Host(data_set)
+            for host_name in data[0][0]:
+                self.logger.debug('Received data - Host: %s', host_name)
+                obj = Host(host_name, self.auth)
                 store_func(obj)
 
 
@@ -519,16 +523,18 @@ class Servicegroup(Hostgroup):
     _table = 'servicegroups'
     _columns = ['members']
 
-    def __init__(self, name):
+    def __init__(self, name, auth):
         """
         The constructor method for class Servicegroup.
 
         Attributes:
             servicegroup    a string with the name of the servicegroup
+            auth            the user credentials
         """
         if Servicegroup.logger is None:
             Servicegroup.logger = setup_logging(self.__class__.__name__)
         self.name = name
+        self.auth = auth
         self.logger.debug('Constructor call passed arguments %s: %s', Servicegroup._table, self.name)
 
     def get_data(self, connection, store_func, query_func=None):
@@ -541,8 +547,8 @@ class Servicegroup(Hostgroup):
         """
         data = connection.query_table(self.get_query())
         if data:
-            for data_set in data[0][0]:
-                obj = Service(data_set[0], data_set[1])
+            for host_name, service in data[0][0]:
+                obj = Service(host_name, service, self.auth)
                 store_func(obj)
 
 
@@ -555,16 +561,19 @@ class HostAndServices(Servicegroup):
     _table = 'hosts'
     _columns = ['name', 'services']
 
-    def __init__(self, name, exclusive=True):
+    def __init__(self, name, auth, exclusive=True):
         """
         The constructor method for class HostAndServices.
 
         Attributes:
             host            a string with the name of the host
+            auth            the user credentials
+            exclusive       if set, services will not included in downtime
         """
         if HostAndServices.logger is None:
             HostAndServices.logger = setup_logging(self.__class__.__name__)
         self.name = name
+        self.auth = auth
         self.exclusive = exclusive
         self.logger.debug('Constructor call passed arguments %s: %s', HostAndServices._table, self.name)
 
@@ -576,7 +585,7 @@ class HostAndServices(Servicegroup):
             string          the query sring for livestatus
         """
         query = Query()
-        return query.get_query(self._table, self._columns, {'name': self.get_name()})
+        return query.get_query(self.auth, self._table, self._columns, {'name': self.get_name()})
 
     def get_name(self):
         """
@@ -599,12 +608,12 @@ class HostAndServices(Servicegroup):
         data = connection.query_table(self.get_query())
         if data:
             for host_name, services in data:
-                obj = Host(host_name)
+                obj = Host(host_name, self.auth)
                 store_func(obj)
                 if not self.exclusive:
                     for service in services:
                         self.logger.debug('Received data - Host: %s Service: %s', host_name, service)
-                        obj = Service(host_name, service)
+                        obj = Service(host_name, service, self.auth)
                         store_func(obj)
 
 
@@ -619,7 +628,7 @@ class Downtime(object):
                 'end_time', 'duration', 'fixed', 'comment']
     _lables = ['ID', 'Grouped ID', 'Author', 'Hostname', 'Servicename', 'Start', 'End', 'Duration', 'Fixed', 'Comment']
 
-    def __init__(self, sites, author, comment=None, groupedid=None, epoch=False):
+    def __init__(self, sites, auth, comment=None, groupedid=None, epoch=False):
         """
         The constructor method for class Downtime.
 
@@ -634,7 +643,8 @@ class Downtime(object):
         if Downtime.logger is None:
             Downtime.logger = setup_logging(self.__class__.__name__)
         self.sites = sites
-        self.author = author
+        self.auth = auth
+        self.author = self.auth.get_user()
         self.comment = comment
         self.groupedid = groupedid
         self.epoch = epoch
@@ -690,9 +700,9 @@ class Downtime(object):
         """
         query = Query()
         if obj is None:
-            return query.get_query(self._table, self._columns)
+            return query.get_query(self.auth, self._table, self._columns)
         else:
-            return query.get_query(self._table, self._columns, obj.get_filter_for_downtime())
+            return query.get_query(self.auth, self._table, self._columns, obj.get_filter_for_downtime())
 
     def list_downtimes(self, is_filter=True):
         """
@@ -735,7 +745,7 @@ class Downtime(object):
         creates and executes the command to remove the specified downtime.
         """
         for site, obj in self._request_objects():
-            obj.get_data(self.sites.sites[site].get_connection(), self.exec_comand, self.get_query, obj)
+            obj.get_data(self.sites.sites[site].get_connection(), self.remove_downtime, self.get_query, obj)
 
     def print_downtime(self, data, obj=None, connection=None):
         """
@@ -765,7 +775,7 @@ class Downtime(object):
                     cmt
                 )
 
-    def exec_comand(self, data, obj, connection):
+    def remove_downtime(self, data, obj, connection):
         """
         This method executes a command if the comment passed by data matches the
         comment stored in this object.
@@ -908,7 +918,6 @@ class Query(object):
     The Query class receives a bunch of arguments and creates a livestatus query
     out of it.
     """
-    # TODO: Add authentication to allow only permited user to set, remove or list downtimes
     # TODO: Combine queries instead of per object querying
     logger = None
 
@@ -919,12 +928,13 @@ class Query(object):
         if Query.logger is None:
             Query.logger = setup_logging(self.__class__.__name__)
 
-    def get_query(self, table, columns, is_filter=None):
+    def get_query(self, auth, table, columns, is_filter=None):
         """
         The method creates a query string with all the received arguments. Then
         it returns the created query.
 
         Attributes:
+            auth            the user credentials
             table           the name of the livestatus table
             columns         the requested columns
             is_filter       optional a dictionary of key value pairs to form the
@@ -938,6 +948,8 @@ class Query(object):
             table,
             self._columns(columns),
             self._filter(is_filter))
+        if auth.get_enabled():
+            query += "\nAuthUser: " + auth.get_user()
         self.logger.debug('Livestatus query: %s', ';'.join(query.split('\n')))
         return query
 
@@ -1042,6 +1054,50 @@ class Command(object):
         self.logger.debug('Livestatus command: COMMAND %s', command)
 
         return command
+
+
+class Auth(object):
+    """
+    This class holds the user credentials.
+    """
+    logger = None
+
+    def __init__(self, user, secret):
+        """
+        The constructor method for class Auth.
+        """
+        if Command.logger is None:
+            Command.logger = setup_logging(self.__class__.__name__)
+        self.user = user
+        self.secret = secret
+        self.enabled = AUTH_ENABLED
+
+    def get_user(self):
+        """
+        Getter method for user.
+
+        Return:
+            string      the user name
+        """
+        return self.user
+
+    def get_secret(self):
+        """
+        Getter method for secret.
+
+        Return:
+            string      the user secret
+        """
+        return self.secret
+
+    def get_enabled(self):
+        """
+        Getter method that returns if AuthUser shall be considered.
+
+        Return:
+            boolean     True if it is enabled else False
+        """
+        return self.enabled
 
 
 # ------------------------------------------------------------------------------
@@ -1196,7 +1252,7 @@ def validate_groupedid(groupedid):
         logger.critical(msg)
         raise argparse.ArgumentTypeError(msg)
 
-def validate_args(args, sites):
+def validate_args(args, sites, auth):
     """
     This function will prepare relevant arguments like the passed host, service,
     hostgroup and servicegroup. It creates the related objects and store the
@@ -1205,6 +1261,7 @@ def validate_args(args, sites):
     Attributes:
         args        the relevant arguments passed by command line
         sites       a reference to a class Sites object
+        auth        the user credentials
 
     Return:
         boolean     True if all went well else False
@@ -1215,20 +1272,20 @@ def validate_args(args, sites):
         mp = ((h, s) for h in args.host.split(',') for s in args.service.split(','))
         # Loop through the list mp and create an object of class service
         for h, s in mp:
-            obj = Service(h, s)
+            obj = Service(h, s, auth)
             sites.append_obj_to_site(obj)
     # only a host is given
     elif args.host:
         for h in args.host.split(','):
-            obj = HostAndServices(h, args.exclusive)
+            obj = HostAndServices(h, auth, args.exclusive)
             sites.append_obj_to_site(obj)
     # only a hostgroup is given
     elif args.hostgroup:
-        obj = Hostgroup(args.hostgroup)
+        obj = Hostgroup(args.hostgroup, auth)
         sites.append_obj_to_site(obj)
     # only a servicegroup is given
     elif args.servicegroup:
-        obj = Servicegroup(args.servicegroup)
+        obj = Servicegroup(args.servicegroup, auth)
         sites.append_obj_to_site(obj)
     # in all other cases generate an error message
     else:
@@ -1344,13 +1401,14 @@ def main(argv):
 
     # Collecting and validating all data
     logger.debug('Collect and validate all passed data')
-    sites = Sites(args.user, args.secret, args.path, args.url)
+    auth = Auth(args.user, args.secret)
+    sites = Sites(auth, args.path, args.url)
     logger.debug('Create downtime object')
-    downtime = Downtime(sites, args.user, args.comment, args.groupedid, args.epoch)
+    downtime = Downtime(sites, auth, args.comment, args.groupedid, args.epoch)
     if args.operation == 'add' and not validate_downtime(args, downtime):
         logger.critical('Error in date and time arguments')
         return 1
-    if not validate_args(args, sites):
+    if not validate_args(args, sites, auth):
         return 1
 
     # List, set or remove downtimes
