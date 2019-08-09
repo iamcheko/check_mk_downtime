@@ -36,60 +36,60 @@ def inventory_downtime_new(info):
     yield "New Downtime Collector", None
 
 
-def add_downtime(gid, user, password, cat, comment, duration, data):
+def run_downtime(gid, user, password, author, operation, cat, comment, duration, data):
     """
     This method calls the downtime script and passes all needed arguments. In
     the event, that the given category isn't known, it return a string
-    :param gid:
-    :param user:
-    :param password:
-    :param cat:
-    :param comment:
-    :param duration:
-    :param data:
-    :return:
+
+    Attributes:
+        gid             a groupedid needed to identify the downtime
+        user            a user, should be an automation user
+        author          the author for the downtime must be the username
+        password        a secret
+        cat             a category one of host, service, host- or servicegroup
+        comment         a descriptive comment for the downtime
+        duration        the duration of the downtime
+        data            the host, service, host- or servicegroup name
+
+    Return:
+        string      a message
     """
+    output = ""
     cmd = os.path.expanduser("~/local/bin/downtime_new")
     now = time.time()
+    if operation in ['add', 'remove']:
+        cmd_string = "{} -g {} -u {} -p {} -o {} -a {} ".format(cmd, str(gid), user, password, op, author)
+        if operation == 'add':
+            cmd_string += "-d {} -c {} ".format(str(duration), comment)
+    else:
+        return 2, "ERROR unknown operation " + operation + "\n"
 
     if cat == 'host':
-        subprocess.call([cmd, '-g ' + str(gid), '-u ' + user, '-p ' + password, '-o', 'add', '-d ' + str(duration), '-c ' + comment, '-n ' + ",".join(data['hostname'])])
-        return 0, 'Adding downtime for server ' + ",".join(data['hostname']) + ' from now until ' + time.ctime(now + duration) + '\n'
+        cmd_string += '-n ' + ",".join(data['hostname'])
     elif cat == 'service':
-        subprocess.call([cmd, '-g ' + str(gid), '-u ' + user, '-p ' + password, '-o', 'add', '-d ' + str(duration), '-c ' + comment, '-n ' + ",".join(data['hostname']), '-s ' + ",".join(data['servicename'])])
-        return 0, 'Adding downtime for server ' + ",".join(data['hostname']) + ' and service ' ",".join(data['servicename']) + ' from now until ' + time.ctime(now + duration) + '\n'
+        cmd_string += '-n ' + ",".join(data['hostname']), '-s ' + ",".join(data['servicename'])
     elif cat == 'hostgroup':
-        subprocess.call([cmd, '-g ' + str(gid), '-u ' + user, '-p ' + password, '-o', 'add', '-d ' + str(duration), '-c ' + comment, '-N ' + ",".join(data['hostgroup'])])
-        return 0, 'Adding downtime for hostgroup ' + ",".join(data['hostgroup']) + ' from now until ' + time.ctime(now + duration) + '\n'
+        cmd_string += '-N ' + ",".join(data['hostgroup'])
     elif cat == 'servicegroup':
-        subprocess.call([cmd, '-g ' + str(gid), '-u ' + user, '-p ' + password, '-o', 'add', '-d ' + str(duration), '-c ' + comment, '-S ' + ",".join(data['servicegroup'])])
-        return 0, 'Adding downtime for servicegroup ' + ",".join(data['servicegroup']) + ' from now until ' + time.ctime(now + duration) + '\n'
+        cmd_string += '-S ' + ",".join(data['servicegroup'])
     else:
-        return "Couldn't add a downtime, category " + cat + " is unknown" + '\n'
+        return 2, "ERROR couldn't add a downtime, category " + cat + " is unknown" + '\n'
 
-
-# remove downtime
-def remove_downtime(gid, user, password, cat, data):
-    cmd = os.path.expanduser("~/local/bin/downtime_new")
-
-    if cat == 'host':
-        subprocess.call([cmd, '-g ' + str(gid), '-u ' + user, '-p ' + password, '-o', 'remove', '-n ' + ",".join(data['hostname'])])
-        return 0, 'Removing downtime for server ' + ",".join(data['hostname']) + '\n'
-    elif cat == 'service':
-        subprocess.call([cmd, '-g ' + str(gid), '-u ' + user, '-p ' + password, '-o', 'remove', '-n ' + ",".join(data['hostname']), '-s ' + ",".join(data['servicename'])])
-        return 0, 'Removing downtime for server ' + ",".join(data['hostname']) + ' and service ' ",".join(data['servicename']) + '\n'
-    elif cat == 'hostgroup':
-        subprocess.call([cmd, '-g ' + str(gid), '-u ' + user, '-p ' + password, '-o', 'remove', '-N ' + ",".join(data['hostgroup'])])
-        return 0, 'Removing downtime for hostgroup ' + ",".join(data['hostgroup']) + '\n'
-    elif cat == 'servicegroup':
-        subprocess.call([cmd, '-g ' + str(gid), '-u ' + user, '-p ' + password, '-o', 'remove', '-S ' + ",".join(data['servicegroup'])])
-        return 0, 'Removing downtime for servicegroup ' + ",".join(data['servicegroup']) + '\n'
+    return_code = subprocess.Popen(cmd_string.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if return_code != 0:
+        output += "ERROR "
+        for line in return_code.stderr.readlines():
+            output += line
+        return 2, output
     else:
-        return 2, "Couldn't add a downtime, category " + cat + " is unknown" + '\n'
-
+        for line in return_code.stdout.readlines():
+            output += line
+        return 0, output
 
 # the check function (dummy)
 def check_downtime_new(item, params, info):
+    status = 0
+
     if not info:
         return 0, "New Downtime Collector has nothing to do..."
 
@@ -98,22 +98,25 @@ def check_downtime_new(item, params, info):
 
     for line in info:
         data = json.loads(" ".join(line[1:]))
-        user = data['user'] if 'user' in data.keys() else None
-        password = data['password'] if 'password' in data.keys() else None
-        gid = data['id'] if 'id' in data.keys() else None
+        for mandatory in ['user', 'password', 'author', 'id', 'operation']:
+            if mandatory not in data.keys():
+                status = 2
+                output += "ERROR in collected downtime data, {0} is mandatory".format(mandatory)
+        if status != 0:
+            return status, output
+
         comment = data['comment'] if 'comment' in data.keys() else ""
         duration = data['duration'] if 'duration' in data.keys() else 7200
-        operation = data['operation'] if 'operation' in data.keys() else None
+
         for op in operation.keys():
             for cat in operation[op].keys():
-                if op == 'add':
-                    status, message = add_downtime(gid, user, password, cat, comment, duration, operation[op][cat])
+                status, message = run_downtime(data['gid'], data['user'], data['password'], data['author'], op, cat, comment, duration, operation[op][cat])
                 elif op == 'remove':
-                    status, message = remove_downtime(gid, user, password, cat, operation[op][cat])
+                    status, message = remove_downtime(gid, user, password, author, cat, operation[op][cat])
                 else:
                     status, message = "ERROR: Unknown operation " + op
 
-                if status >
+                if status != 0
                 output += message
 
     return 1, output

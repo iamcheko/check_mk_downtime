@@ -55,8 +55,6 @@ import requests
 # ------------------------------------------------------------------------------
 # make logging facility globally available
 global logger
-# enable restricted access for users
-AUTH_ENABLED = False
 
 # build the working environment
 path_bin = os.path.dirname(os.path.realpath(__file__))
@@ -628,7 +626,7 @@ class Downtime(object):
                 'end_time', 'duration', 'fixed', 'comment']
     _lables = ['ID', 'Grouped ID', 'Author', 'Hostname', 'Servicename', 'Start', 'End', 'Duration', 'Fixed', 'Comment']
 
-    def __init__(self, sites, auth, comment=None, groupedid=None, epoch=False):
+    def __init__(self, sites, auth, comment=None, groupedid=None, epoch=False, quiet=False, limit=100):
         """
         The constructor method for class Downtime.
 
@@ -639,15 +637,19 @@ class Downtime(object):
             groupedid       a groupedid string for the downtime
             epoch           show time representations in epoch instead of human
                             readable
+            quiet           no output
+            limit           limit the output to a given amount of lines
         """
         if Downtime.logger is None:
             Downtime.logger = setup_logging(self.__class__.__name__)
         self.sites = sites
         self.auth = auth
-        self.author = self.auth.get_user()
+        self.author = self.auth.get_author()
         self.comment = comment
         self.groupedid = groupedid
         self.epoch = epoch
+        self.quiet = quiet
+        self.limit = limit
         self.data = []
         self.dates = {
             'now': int(datetime.now().strftime('%s')),
@@ -801,6 +803,25 @@ class Downtime(object):
         """
         return self.author
 
+    def get_quiet(self):
+        """
+        Getter method, returns True if quiet mode is enabled. Has no impact on list
+        operation.
+
+        Return:
+            boolean         True if quiet mode is enabled else False
+        """
+        return self.quiet
+
+    def get_limit(self):
+        """
+        Getter method, returns the line limit of lines to be printed.
+
+        Return:
+            int             the number of lines to be printed
+        """
+        return self.limit
+
     def get_comment(self):
         """
         Getter method, returns the descriptive text for the reason of the downtime.
@@ -948,7 +969,7 @@ class Query(object):
             table,
             self._columns(columns),
             self._filter(is_filter))
-        if auth.get_enabled():
+        if auth.get_authorization():
             query += "\nAuthUser: " + auth.get_user()
         self.logger.debug('Livestatus query: %s', ';'.join(query.split('\n')))
         return query
@@ -1000,6 +1021,7 @@ class Command(object):
     command method of the livestatus module.
     """
     logger = None
+    line_count = 0
 
     def __init__(self):
         """
@@ -1007,6 +1029,39 @@ class Command(object):
         """
         if Command.logger is None:
             Command.logger = setup_logging(self.__class__.__name__)
+
+    def print_details(self, obj, downtime, operation):
+        """
+        This method prints details which hosts and services have been set or removed
+        from downtime.
+
+        Attributes:
+            obj         a reference to a object of class Host or Service
+            downtime    a reference to the downtime object
+            operation   either add or remove
+        """
+        if not downtime.get_quiet():
+            if Command.line_count < downtime.get_limit():
+                Command.line_count += 1
+                dict = obj.get_filter_for_downtime()
+                if dict['service_description'] != '':
+                    string = "host {0} and service {1}".format(dict['host_name'], dict['service_description'])
+                else:
+                    string = "host {0}".format(dict['host_name'])
+
+                if operation == 'add' and not downtime.get_quiet():
+                    print "Adding downtime with the grouped id {0} for {1} from {2} for a duration of {3} seconds untill {4} created by {5}.".format(
+                        downtime.get_groupedid(),
+                        string,
+                        str(datetime.fromtimestamp(downtime.get_start_time())),
+                        str(downtime.get_duration()),
+                        str(datetime.fromtimestamp(downtime.get_end_time())),
+                        downtime.get_author())
+                else:
+                    print "Removing downtime with the grouped id {0} for {1} created by {2}.".format(
+                        downtime.get_groupedid(),
+                        string,
+                        downtime.get_author())
 
     def add_downtime(self, obj, downtime):
         """
@@ -1030,6 +1085,7 @@ class Command(object):
         command += downtime.get_comment() + " "
         command += downtime.get_groupedid() + "\n"
         self.logger.debug('Livestatus command: COMMAND %s', command)
+        self.print_details(obj, downtime, 'add')
 
         return command
 
@@ -1052,6 +1108,7 @@ class Command(object):
             obj.get_downtime_operation('remove'),
             str(dtid))
         self.logger.debug('Livestatus command: COMMAND %s', command)
+        self.print_details(obj, downtime, 'remove')
 
         return command
 
@@ -1062,7 +1119,7 @@ class Auth(object):
     """
     logger = None
 
-    def __init__(self, user, secret):
+    def __init__(self, user, secret, authorization, author=None):
         """
         The constructor method for class Auth.
         """
@@ -1070,7 +1127,21 @@ class Auth(object):
             Command.logger = setup_logging(self.__class__.__name__)
         self.user = user
         self.secret = secret
-        self.enabled = AUTH_ENABLED
+        self.authorization = authorization
+
+        if self.get_authorization():
+            self.author = author
+        else:
+            self.author = user
+
+    def get_author(self):
+        """
+        Getter method for author.
+
+        Return:
+            string      the author name
+        """
+        return self.author
 
     def get_user(self):
         """
@@ -1090,14 +1161,14 @@ class Auth(object):
         """
         return self.secret
 
-    def get_enabled(self):
+    def get_authorization(self):
         """
         Getter method that returns if AuthUser shall be considered.
 
         Return:
             boolean     True if it is enabled else False
         """
-        return self.enabled
+        return self.authorization
 
 
 # ------------------------------------------------------------------------------
@@ -1243,7 +1314,6 @@ def validate_groupedid(groupedid):
     Return:
         string      a valid groupedid string
     """
-    string = ""
     try:
         logger.debug('Valid groupedid: %d', int(groupedid[:12]))
         return 'ID:{0:012d}'.format(int(groupedid[:12]))
@@ -1350,16 +1420,13 @@ def main(argv):
     ggroupedid.add_argument('-i', '--ignore', action='store_true', default=False,
                           help='Bypass the groupedid argument, only available for the list argument'
                           )
-    parser.add_argument('-C', '--epoch', action='store_true',
-                        default=False,
+    parser.add_argument('-C', '--epoch', action='store_true', default=False,
                         help='Shows the listed downtimes in epoch instead of date and time (default: False)'
                         )
-    parser.add_argument('-U', '--url',
-                        default='http://localhost/cmk_master/check_mk/',
+    parser.add_argument('-U', '--url', default='http://localhost/cmk_master/check_mk/',
                         help='Base-URL of Multisite (default: guess local OMD site)'
                         )
-    parser.add_argument('-P', '--path',
-                        default='/omd/sites',
+    parser.add_argument('-P', '--path', default='/omd/sites',
                         help='The OMD base path (default: /omd/sites)'
                         )
     parser.add_argument('-v', '--verbose', action='store_true',
@@ -1390,21 +1457,40 @@ def main(argv):
                         )
 
     # Identification
+    parser.add_argument('-a', '--author', default=None,
+                        help='Check_MK user name'
+                        )
     parser.add_argument('-u', '--user', required=True,
                         help='Name of the automation user'
                         )
     parser.add_argument('-p', '--secret', required=True,
                         help='Secret of the automation user'
                         )
+    parser.add_argument('-A', '--authorization', action='store_true', default=False,
+                        help='This enables the AuthUser function of livestatus'
+                        )
+
+    # Miscellaneous
+    parser.add_argument('-q', '--quiet', action='store_true', default=False,
+                        help='Be quiet, there will be no output for add or removed downtimes'
+                        )
+    parser.add_argument('-l', '--limit', type=int, default=100,
+                        help='Limit the output for adding or removing downtimes (default: 100)'
+                        )
+
     args = parser.parse_args(argv)
+    if args.authorization and args.author == None:
+        logger.critical('Error authorization enabled but author has been not given')
+        return 1
+
     logger.debug('Passed CLI arguments: %r', args)
 
     # Collecting and validating all data
     logger.debug('Collect and validate all passed data')
-    auth = Auth(args.user, args.secret)
+    auth = Auth(args.user, args.secret, args.authorization, args.author)
     sites = Sites(auth, args.path, args.url)
     logger.debug('Create downtime object')
-    downtime = Downtime(sites, auth, args.comment, args.groupedid, args.epoch)
+    downtime = Downtime(sites, auth, args.comment, args.groupedid, args.epoch, args.quiet, args.limit)
     if args.operation == 'add' and not validate_downtime(args, downtime):
         logger.critical('Error in date and time arguments')
         return 1
@@ -1437,4 +1523,3 @@ def main(argv):
 if __name__ == '__main__':
     logger = setup_logging('main')
     sys.exit(main(sys.argv[1:]))
-
