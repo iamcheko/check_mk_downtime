@@ -462,7 +462,7 @@ class Hostgroup(object):
     _table = 'hostgroups'
     _columns = ['members']
 
-    def __init__(self, name, auth):
+    def __init__(self, name, auth, exclusive=False):
         """
         The constructor method for class Hostgroup.
 
@@ -474,6 +474,7 @@ class Hostgroup(object):
             Hostgroup.logger = setup_logging(self.__class__.__name__)
         self.name = name
         self.auth = auth
+        self.exclusive = exclusive
         self.logger.debug('Constructor call passed arguments %s: %s', Hostgroup._table, self.name)
 
     def get_query(self):
@@ -488,12 +489,30 @@ class Hostgroup(object):
 
     def get_name(self):
         """
-        A getter method to retrieve the name of the hostgroup.
+        A getter method to return the name of the hostgroup.
 
         Return:
             string          a string with the hostgroup name
         """
         return self.name
+
+    def get_auth(self):
+        """
+        A getter method to return the reference to the authentication credentials.
+
+        Return:
+            dictionary      a reference to the auth dictionary
+        """
+        return self.name
+
+    def get_exclusive(self):
+        """
+        A getter method to figure out if Services should be considered.
+
+        Return:
+            boolean         True if Services shall be excluded else False
+        """
+        return self.exclusive
 
     def get_data(self, connection, store_func, query_func=None):
         """
@@ -508,7 +527,7 @@ class Hostgroup(object):
         if data:
             for host_name in data[0][0]:
                 self.logger.debug('Received data - Host: %s', host_name)
-                obj = Host(host_name, self.auth)
+                obj = HostAndServices(host_name, self.get_auth())
                 store_func(obj)
 
 
@@ -546,7 +565,7 @@ class Servicegroup(Hostgroup):
         data = connection.query_table(self.get_query())
         if data:
             for host_name, service in data[0][0]:
-                obj = Service(host_name, service, self.auth)
+                obj = Service(host_name, service, self.get_auth())
                 store_func(obj)
 
 
@@ -559,7 +578,7 @@ class HostAndServices(Servicegroup):
     _table = 'hosts'
     _columns = ['name', 'services']
 
-    def __init__(self, name, auth, exclusive=True):
+    def __init__(self, name, auth, exclusive=False):
         """
         The constructor method for class HostAndServices.
 
@@ -577,22 +596,13 @@ class HostAndServices(Servicegroup):
 
     def get_query(self):
         """
-        A getter method to retrieve the query.
+        A getter method to return the query.
 
         Return:
             string          the query sring for livestatus
         """
         query = Query()
         return query.get_query(self.auth, self._table, self._columns, {'name': self.get_name()})
-
-    def get_name(self):
-        """
-        A getter method to retrieve the name of the hostgroup.
-
-        Return:
-            string          a string with the hostgroup name
-        """
-        return self.name
 
     def get_data(self, connection, store_func, query_func=None):
         """
@@ -606,12 +616,12 @@ class HostAndServices(Servicegroup):
         data = connection.query_table(self.get_query())
         if data:
             for host_name, services in data:
-                obj = Host(host_name, self.auth)
+                obj = Host(host_name, self.get_auth())
                 store_func(obj)
-                if not self.exclusive:
+                if not self.get_exclusive():
                     for service in services:
                         self.logger.debug('Received data - Host: %s Service: %s', host_name, service)
-                        obj = Service(host_name, service, self.auth)
+                        obj = Service(host_name, service, self.get_auth())
                         store_func(obj)
 
 
@@ -626,7 +636,7 @@ class Downtime(object):
                 'end_time', 'duration', 'fixed', 'comment']
     _lables = ['ID', 'Grouped ID', 'Author', 'Hostname', 'Servicename', 'Start', 'End', 'Duration', 'Fixed', 'Comment']
 
-    def __init__(self, sites, auth, comment=None, groupedid=None, epoch=False, quiet=False, limit=100):
+    def __init__(self, sites, auth, comment='', groupedid=None, epoch=False, quiet=False, limit=100):
         """
         The constructor method for class Downtime.
 
@@ -1351,7 +1361,7 @@ def validate_args(args, sites, auth):
             sites.append_obj_to_site(obj)
     # only a hostgroup is given
     elif args.hostgroup:
-        obj = Hostgroup(args.hostgroup, auth)
+        obj = Hostgroup(args.hostgroup, auth, args.exclusive)
         sites.append_obj_to_site(obj)
     # only a servicegroup is given
     elif args.servicegroup:
@@ -1392,7 +1402,7 @@ def main(argv):
                        help='The name of the hostgroup'
                        )
     # just host no services
-    parser.add_argument('-x', '--exclusive', action='store_true',
+    parser.add_argument('-x', '--exclusive', action='store_true', default=False,
                         help='Just define downtime for the host without services'
                         )
 
@@ -1410,8 +1420,8 @@ def main(argv):
                         choices=['add', 'list', 'remove'],
                         help='Specify a operation, one of add, remove or list (default is list)'
                         )
-    parser.add_argument('-c', '--comment', default=None,
-                          help='Descriptive comment for the downtime downtime'
+    parser.add_argument('-c', '--comment', default='Maintenance',
+                          help='Descriptive comment for the downtime downtime (default: Maintenance)'
                           )
     ggroupedid = parser.add_mutually_exclusive_group(required=True)
     ggroupedid.add_argument('-g', '--groupedid', type=validate_groupedid,
